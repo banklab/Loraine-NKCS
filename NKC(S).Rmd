@@ -49,7 +49,7 @@ IM_random <- function(n, k){
   
   if (n == 2 & k == 1){
     
-    IM_random <- matrix(n, n, data = rep(2, n^2))
+    IM_random <- matrix(n, n, data = rep(1, n^2))
     
   } else {
   
@@ -274,6 +274,29 @@ IM_hierarchical <- function(n, k){
   return(IM_hierarchical)
   
 }
+
+IM_hierarchical_c <- function(n, c){
+  
+  IM_hierarchical <- matrix(n, n, data = rep(0, n^2)) # matrix with dimensions n x n, initiated with 0s
+
+    for (i in 1:n){# for each column
+      
+      for (j in 1:n){# for each row
+        
+        if (sum(IM_hierarchical) < n*c & j>=i) { # below and including the diagonal until we get to n*c interactions among loci
+          
+          IM_hierarchical[j,i] <- 1
+        
+      }
+      
+    }
+    
+  }
+  
+  return(IM_hierarchical)
+  
+}
+
 ```
 
 # 2.6) Dependent (Rivkin & Siggelkow, 2007)
@@ -303,6 +326,30 @@ for (i in n:1){# for each row
   return(IM_dependent)
   
 }
+
+IM_dependent_c <- function(n, c){
+  
+  IM_dependent <- matrix(n, n, data = rep(0, n^2)) # matrix with dimensions n x n, initiated with 0s
+
+for (i in n:1){# for each row
+      
+      for (j in n:1){# for each column
+        
+        if (sum(IM_dependent) < n*c & i>=j) { # below and including the the diagonal until we get to n*c interactions among loci
+          
+          IM_dependent[i,j] <- 1
+        
+      }
+      
+    }
+    
+  }
+  
+  
+  return(IM_dependent)
+  
+}
+
 ```
 
 ## 3) Creating the landscape
@@ -361,11 +408,75 @@ fitness_calc_mult <- function(gene_vector){
 
 ```
 
-# 3.4) Generate NKC(S) landscape
+# 3.4) Generate intergenomic interaction matrices
+```{r IM_c}
+
+build_IMc <- function(IM = c("R", "M", "P", "H", "D"),
+                      n,
+                      c,
+                      s,
+                      s_tot){
+  
+  # determine how to construct the intergenomic epistatic interactions and what kind of interaction matrix (IM) to use 
+  if (IM == "R"){# for Random matrix
+    
+    matrix_c <- IM_random_c
+     
+  } else if (IM == "M"){# for Modular matrix
+    
+    matrix_c <- IM_modular_c
+    
+  } else if (IM == "N"){# for nearest neighbour matrix
+    
+    matrix_c <- IM_neighbour_c
+    
+  } else if (IM == "P"){# for preferential interaction matrix
+    
+    matrix_c <- IM_preferential_c
+    
+  } else if (IM == "H"){# for hierarchical interaction matrix
+    
+    matrix_c <- IM_hierarchical_c
+    
+  } else if (IM == "D"){# for dependent interaction matrix
+    
+    matrix_c <- IM_dependent_c
+    
+  }
+  
+  matrix_c_species <- list()
+  
+  # for each species in the system
+  for (i in 1:s_tot){
+    
+    # I need IM to describe the interaction between a focal species and each of its interaction partners
+    matrix_temp <- list() # I collect this in a temporary list
+    
+    # so, for each interaction partner:
+    for (j in 1:s){
+      
+      # generation intergenomic interaction matrix
+      matrix_temp[[j]] <- matrix_c(n,c)
+      
+    }
+    
+    matrix_merged <- do.call(cbind, matrix_temp) # merge all IM by column (rows = loci in focal genome and then columns = all the loci in all the interacting species)
+     matrix_c_species[[i]] <- matrix_merged
+    
+  }
+  
+  return(matrix_c_species)
+  
+}
+
+```
+
+# 3.5) Generate NKC(S) landscape
 ```{r generate landscape}
 build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of interaction matrix (intragenomic epistasis)
+                            IM_c, # I need to define the interaction matrix for intergenomic epistasis separately, so I can also refer to it during the adaptive walk
                             fitness_contrib = c("N", "U"), # way to draw fitness contributions (normal vs. uniform distribution)
-                            fitness_calculation = c("KJ", "WW"), # way to calculate fitness (accodring to Kauffman & Johnson or Welch & Waxman) 
+                            fitness_calculation = c("KJ", "WW"), # way to calculate fitness (according to Kauffman & Johnson or Welch & Waxman) 
                             n, # nb of loci
                             k, # nb of interacting loci within a species
                             a, # nb of alleles per locus
@@ -472,8 +583,9 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
         
         # which loci determine the fitness contribution at this locus?
         interesting_loci_k <- which(matrix_k_species[[i]][l, ] != 0) # based on the intragenomic IM
+        interesting_loci_c <- which(IM_c[[i]][l,] != 0) # based on intergenomic IM
         
-        interesting_loci <- c(interesting_loci_k, (n+1):(n+(c*s))) # the "interesting" intergenomic epistasis loci are at the end of the "extended" genotype
+        interesting_loci <- c(interesting_loci_k, interesting_loci_c+n) # list of all loci that have an affect on the fitness contribution
 
         # what are the alleles present at the loci we're interested in for this given genotype?
         alleles <- genotypes[j, interesting_loci]
@@ -482,9 +594,9 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
         index <- 1
       
         # for all loci contributing to h:
-        for (m in 1:(k+1+(c*s))) {
+        for (m in 1:(k+1+(s*c))) {
         
-        index <- index + (a^((k+1+(c*s))-m))*(alleles[m]-1)
+        index <- index + (a^((k+1+(s*c))-m))*(alleles[m]-1)
         
         }
       
@@ -502,9 +614,9 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
     # combine the genotype table and the fitness table
     genotype_table_species[[i]] <- cbind(genotypes, fitnesses) # combining the genotype table and the fitness table
     # columns 1 to n represent the allelic values at each locus in the genome of the focal species
-    # columns n+1 to n+(c*s) represent the allelic values at each locus in the genomes of the interacting species (= intergenomic epistasis)
-    # columns n+(c*s)+1 to 2n+(c*s) are the fitness contributions per locus (h) for loci in the genome of the focal species
-    # column 2n+(c*s)+1 is the calculated total fitness for each "extended" genotype
+    # columns n+1 to n+(s*n) represent the allelic values at each locus in the genomes of the interacting species (= intergenomic epistasis)
+    # columns n+(s*n)+1 to 2n+(s*n) are the fitness contributions per locus (h) for loci in the genome of the focal species
+    # column 2n+(s*n)+1 is the calculated total fitness for each genotype taking into account all genetic interactions
       
   }
   
@@ -565,7 +677,7 @@ visual_landscape <- function(landscape, n, c, s) {
     
     landscape_df$seq[i] <- paste(paste(landscape_df[i, 1:n], collapse = ""), "-", c(paste(landscape_df[i, (n+1):(n+s*n)], collapse = ""))) # alternate way of representing the genotypes; this is purely visual information to plot
 
-    for (locus in 1:(n+c*s)) {
+    for (locus in 1:(n+s*n)) {
       
       if (landscape_df[i,locus] != 1) {
         
@@ -620,7 +732,7 @@ visual_landscape <- function(landscape, n, c, s) {
     
   }
   
-  names(graph_df)[2*n+2] <- "fitness"
+  names(graph_df)[3*n+1] <- "fitness"
   graph_df$genotypeID <- as.factor(graph_df$genotypeID)
   
   return(graph_df)
@@ -630,7 +742,14 @@ visual_landscape <- function(landscape, n, c, s) {
 
 ```{r test landscape}
 
+IM_c <- build_IMc(IM = "R",
+                      n = 2,
+                      c = 1,
+                      s = 1,
+                      s_tot = 2)
+
 testscape <- build_landscape(IM_k = "R",
+                             IM_c, 
                 fitness_contrib = "N",
                 fitness_calculation = "KJ",
                 n = 2,
