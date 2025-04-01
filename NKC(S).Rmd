@@ -473,7 +473,7 @@ build_IMc <- function(IM = c("R", "M", "P", "H", "D"),
 
 # 3.5) Generate NKC(S) landscape
 ```{r generate landscape}
-build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of interaction matrix (intragenomic epistasis)
+build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of interaction matrix (intragenomic epistasis); this will be genrated here - or should I do this outside the function?
                             IM_c, # I need to define the interaction matrix for intergenomic epistasis separately, so I can also refer to it during the adaptive walk
                             fitness_contrib = c("N", "U"), # way to draw fitness contributions (normal vs. uniform distribution)
                             fitness_calculation = c("KJ", "WW"), # way to calculate fitness (according to Kauffman & Johnson or Welch & Waxman) 
@@ -884,6 +884,96 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
 
 ```
 
+
+# 6) visualise the whole system 
+```{r visualise systems and adaptive walks}
+
+visualise_system <- function(landscapes,
+                             n,
+                             c,
+                             s,
+                             s_tot){
+  
+  visual_scapes_df <- NULL
+  
+  # combining all data frames into one, so I can plot the fitness landscape of each species as a separate facet 
+  for (i in 1:s_tot){
+    
+    temp <- visual_landscape(landscapes[[i]], 
+                                     n, 
+                                     c, 
+                                     s)
+    temp$species <- i # to differentiate between species
+    
+    visual_scapes_df <- rbind(visual_scapes_df, temp)
+    
+  }
+  
+  ggplot(visual_scapes_df,
+       aes(x = mutations,
+           y = fitness)) +
+  geom_line(data = visual_scapes_df,
+            aes(group = group,
+                linetype = mut),
+            color="grey80",
+            linewidth = 0.7) +
+  geom_label(label = visual_scapes_df$seq,
+             aes(col = seq)) +
+  scale_linetype_manual(breaks = c("intra", "inter"),
+                        values = c("solid", "dashed"))+
+  xlab("Hamming distance from reference") +
+  ylab("Fitness") +
+    facet_wrap(~species) +
+  theme_bw() +
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.5, linetype = 2),
+        panel.grid.minor.x = element_blank(),
+        text = element_text(size = 15),
+        axis.text = element_text(size = 13))
+  
+}
+
+visualise_walks <- function(adaptive_walks,
+                            n,
+                            s,
+                            s_tot,
+                            landscapes){
+  
+  
+  walks_df <- NULL
+
+  # combining all data frames into one, so I can plot the adaptive walk of each species as a separate facet 
+  for (i in 1:s_tot){
+    
+    temp <- as.data.frame(adaptive_walks[[i]])
+    temp$peak <- unique(landscapes[[i]][which(landscapes[[i]][, 2*n+(s*n)+1] == max(landscapes[[i]][, 2*n+(s*n)+1])), 2*n+(s*n)+1]) # I also want to plot the fitness of the global fitness peak 
+    
+    temp$species <- i # to differentiate between species
+    
+    walks_df <- rbind(walks_df, temp)
+
+  }
+  
+  colnames(walks_df)[2*n+(s*n)+1] <- "Fitness"
+
+  ggplot(walks_df,
+       aes(x = step,
+           y = Fitness)) +
+  geom_line() +
+    geom_hline(aes(yintercept = peak),
+               linetype = "dashed",
+               col = "firebrick3") +
+    facet_wrap(~species) +
+  theme_bw()
+  
+}
+
+```
+
+
+# XX) test run
 ```{r test landscape}
 
 n = 2
@@ -912,44 +1002,22 @@ testscape <- build_landscape(IM_k = "R",
                 fit_mean = 0,
                 fit_sd = 0.5)
 
-visual_testscape <- visual_landscape(testscape[[2]], 
-                                     n, 
-                                     c, 
-                                     s)
-
-scape_pic <- ggplot(visual_testscape,
-       aes(x = mutations,
-           y = fitness)) +
-  geom_line(data = visual_testscape,
-            aes(group = group,
-                linetype = mut),
-            color="grey80",
-            linewidth = 0.7) +
-  geom_label(label = visual_testscape$seq,
-             aes(col = seq)) +
-  scale_linetype_manual(breaks = c("intra", "inter"),
-                        values = c("solid", "dashed"))+
-  xlab("Hamming distance from reference") +
-  ylab("Fitness") +
-  theme_bw() +
-  theme(legend.position = "none",
-        panel.grid.major.y = element_blank(),
-        panel.grid.minor.y = element_blank(),
-        panel.grid.major.x = element_line(linewidth = 0.5, linetype = 2),
-        panel.grid.minor.x = element_blank(),
-        text = element_text(size = 15),
-        axis.text = element_text(size = 13))
+system_fig <- visualise_system(testscape,
+                 n,
+                 c,
+                 s,
+                 s_tot)
 
 ggsave(path = "./",
        device = "pdf",
        units = c("cm"),
-       width = 15,
-       height = 10,
-       filename = "NKCS_2111_sp2.pdf",
-       plot = scape_pic)
+       width = 30,
+       height = 12,
+       filename = "NKCS_2111_sp1sp2.pdf",
+       plot = system_fig)
 
 walk_test <- adaptive_walk(testscape, 
-              walk = "greedy",
+              walk = "prop",
               n,
               c,
               s, 
@@ -958,13 +1026,18 @@ walk_test <- adaptive_walk(testscape,
               start = c("WT"),
               max_steps=100)
 
-walk_test_df <- as.data.frame(walk_test[[1]])
-colnames(walk_test_df)[2*n+(s*n)+1] <- "fitness"
+walks_fig <- visualise_walks(walk_test,
+                n,
+                s,
+                s_tot,
+                testscape)
 
-ggplot(walk_test_df,
-       aes(x = step,
-           y = fitness)) +
-  geom_line() +
-  theme_bw()
+ggsave(path = "./",
+       device = "pdf",
+       units = c("cm"),
+       width = 30,
+       height = 12,
+       filename = "NKCS_2111_sp1sp2_greedy.pdf",
+       plot = walks_fig)
 
-```
+ ```
