@@ -16,12 +16,12 @@ rm (list = ls())
 
 library(ggplot2) 
 library(gtools)
+library(dplyr) 
 
 ```
 
 ### The NKC(S) model
 code for NK model based on explanations from Welch & Waxman (2005) and supported by python code from Maciej Workiewicz (https://github.com/Mac13kW/NK_model)
-
 the NK model was introduced by Kauffman & Weinberger (1989) and the NKC(S) model was introduced by Kauffman & Johnson (1991)
 
 ## 1) Variable explanations
@@ -335,7 +335,7 @@ for (i in n:1){# for each row
       
       for (j in n:1){# for each column
         
-        if (sum(IM_dependent) < n*c & i>=j) { # below and including the the diagonal until we get to n*c interactions among loci
+        if (sum(IM_dependent) < n*c & i>=j) { # below and including the diagonal until we get to n*c interactions among loci
           
           IM_dependent[i,j] <- 1
         
@@ -471,10 +471,63 @@ build_IMc <- function(IM = c("R", "M", "P", "H", "D"),
 
 ```
 
+# 3.4) Generate intragenomic interaction matrices
+```{r IM_k}
+
+build_IMk <- function(IM = c("R", "M", "N", "P", "H", "D"),
+                      n,
+                      k,
+                      s,
+                      s_tot){
+
+  # determine how to construct the intragenomic epistatic interactions and what kind of interaction matrix (IM) to use 
+  if (IM == "R"){# for Random matrix
+    
+    matrix_k <- IM_random
+     
+  } else if (IM == "M"){# for Modular matrix
+    
+    matrix_k <- IM_modular
+    
+  } else if (IM == "N"){# for nearest neighbour matrix
+    
+    matrix_k <- IM_neighbour
+    
+  } else if (IM == "P"){# for preferential interaction matrix
+    
+    matrix_k <- IM_preferential
+    
+  } else if (IM == "H"){# for hierarchical interaction matrix
+    
+    matrix_k <- IM_hierarchical
+    
+  } else if (IM == "D"){# for dependent interaction matrix
+    
+    matrix_k <- IM_dependent
+    
+  }
+  
+  matrix_k_species <- list()
+  
+  # for each species in the system
+  for (i in 1:s_tot){
+    
+      # generation intragenomic interaction matrix
+      matrix_k_species[[i]] <- matrix_k(n,k)
+
+  }
+  
+  return(matrix_k_species)
+
+}
+
+
+```
+
 # 3.5) Generate NKC(S) landscape
 ```{r generate landscape}
-build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of interaction matrix (intragenomic epistasis); this will be genrated here - or should I do this outside the function?
-                            IM_c, # I need to define the interaction matrix for intergenomic epistasis separately, so I can also refer to it during the adaptive walk
+build_landscape <- function(IM_k, # intragenomic epistasis matrices
+                            IM_c, # intergenomic epistasis matrices
                             fitness_contrib = c("N", "U"), # way to draw fitness contributions (normal vs. uniform distribution)
                             fitness_calculation = c("KJ", "WW"), # way to calculate fitness (according to Kauffman & Johnson or Welch & Waxman) 
                             n, # nb of loci
@@ -487,34 +540,7 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
                             fit_sd) # sd of fintess distribution when drawing from a normal distribution, or max fitness when drawing from a uniform distribution
   {
   
-  # determine how to construct the intragenomic epistatic interactions and what kind of interaction matrix (IM) to use 
-  if (IM_k == "R"){# for Random matrix
-    
-    matrix_k <- IM_random
-     
-  } else if (IM_k == "M"){# for Modular matrix
-    
-    matrix_k <- IM_modular
-    
-  } else if (IM_k == "N"){# for nearest neighbour matrix
-    
-    matrix_k <- IM_neighbour
-    
-  } else if (IM_k == "P"){# for preferential interaction matrix
-    
-    matrix_k <- IM_preferential
-    
-  } else if (IM_k == "H"){# for hierarchical interaction matrix
-    
-    matrix_k <- IM_hierarchical
-    
-  } else if (IM_k == "D"){# for dependent interaction matrix
-    
-    matrix_k <- IM_dependent
-    
-  }
 
-  
   # how to generate allelic values? (normal distribution vs uniform distribution)
   if (fitness_contrib == "N"){# for drawing from a normal distribution
     
@@ -543,16 +569,8 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
   # generate all possible fitness contributions depending on k epistatic interactions within species and c epistatic interactions with s other species
   h_table_species <- list() # a list with all look up tables for each of the s_tot species; each list item is a look-up table of dimension n x a^(k+1+c*s) for all possible allelic values
   
-  # list of intragenomic epistasis IM for each species
-  matrix_k_species <- list()
-  
-  # table to keep track of all fitness vectors
-  fitnesses_species <- NULL
-  
   # for each species:
   for (i in 1:s_tot){
-    
-    matrix_k_species[[i]] <- matrix_k(n,k)
     
     # generate look-up table with all possible allelic values (dependent on k+1+c*s loci within and between species); dimension n x a^(k+1+c*s) for all possible allelic values
     # each column = 1 locus, each row = different genetic background
@@ -582,7 +600,7 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
       for (l in 1:n) { # skipping "k" to iterate over, since k is used as a variable
         
         # which loci determine the fitness contribution at this locus?
-        interesting_loci_k <- which(matrix_k_species[[i]][l, ] != 0) # based on the intragenomic IM
+        interesting_loci_k <- which(IM_k[[i]][l, ] != 0) # based on the intragenomic IM
         interesting_loci_c <- which(IM_c[[i]][l,] != 0) # based on intergenomic IM
         
         interesting_loci <- c(interesting_loci_k, interesting_loci_c+n) # list of all loci that have an affect on the fitness contribution
@@ -617,7 +635,14 @@ build_landscape <- function(IM_k = c("R", "M", "N", "P", "H", "D"), # type of in
     # columns n+1 to n+(s*n) represent the allelic values at each locus in the genomes of the interacting species (= intergenomic epistasis)
     # columns n+(s*n)+1 to 2n+(s*n) are the fitness contributions per locus (h) for loci in the genome of the focal species
     # column 2n+(s*n)+1 is the calculated total fitness for each genotype taking into account all genetic interactions
-      
+    
+    # store as data frame for ease of proceeding
+    genotype_table_species[[i]] <- as.data.frame(genotype_table_species[[i]])
+    colnames(genotype_table_species[[i]])[1:n] <- paste0("F.", 1:n) # loci of focal species ("F")
+    colnames(genotype_table_species[[i]])[(n+1):(n+(s*n))] <- paste0("P.", 1:(s*n)) # loci of partner species ("P")
+    colnames(genotype_table_species[[i]])[(n+(s*n)+1):(2*n+(s*n))] <- paste0("h.", 1:n)
+    colnames(genotype_table_species[[i]])[2*n+(s*n)+1] <- "fitness"
+    
   }
   
   return(genotype_table_species)
@@ -709,7 +734,7 @@ visual_landscape <- function(landscape, n, c, s) {
       # assign the same ID to one of its neighbours and add it to the data frame
       neighbours[j, "group"] <- pair
       
-      # check whether this neighbour is connected through a mutation in within the genome (intra) or between the genomes (inter)
+      # check whether this neighbour is connected through a mutation within the genome (intra) or between the genomes (inter)
       if (paste(neighbours[j, 1:n], collapse = "") == paste(landscape_df[i, 1:n], collapse = "")){
         
          landscape_df[i, "mut"] <- "inter"
@@ -755,7 +780,7 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
                           s, # nb. of species interacting
                           s_tot, # total number of species in the system
                           IM_c,
-                          start = c("WT"), # choosing starting genotype
+                          start = c("WT", "R"), # choosing starting genotype
                           max_steps=100) # max. number of steps on the landscape before I interrupt
 {
   
@@ -784,6 +809,24 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     
   }
   
+  if (start == "R"){
+    
+    random_seq <- sample(a, n*s_tot, replace = TRUE) # I'm just generating a random sequencing to start with; I guess right now this only works if all species interact with each other (s = s_tot-1)
+    
+    for (i in 1:s_tot){
+      temp_seq <- NA # here I will store the sequence for each species; this will be updated as the positions of loci in the sequence will change for each species (focal species always at the start of the sequence)
+
+      temp_seq[1:n] <- random_seq[(1+(i-1)*n):(n+(i-1)*n)] # these are the allelic values for the loci in the focal species
+      temp_seq[(n+1):(n+n*s)] <- random_seq[-c((1+(i-1)*n):(n+(i-1)*n))] # these are the allelic values for the loci in the interacting species
+
+      walks[[i]] <- landscape_df[[i]][rowSums(mapply(`==`, landscape_df[[i]][, 1:(n+n*s)], temp_seq)) == n+n*s,] # this will give us the starting point of the adaptive walk; I'm matching the entry in the genotype table to the random sequence I generated here
+      walks[[i]]$step <- 0 # to signalise that this is the initial genotype
+      walks[[i]]$focal <- NA # later I can store the ID of the focal species (the species that is mutating)
+      
+    }
+    
+  }
+  
   # set current genotype
   current_genotypes <- walks # this will be updated as we navigate the landscape(s)
   
@@ -802,7 +845,7 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     neighbours <- findNeighbours(landscape_df[[i]], current_genotypes[[i]]$ID, n)
     
     # but now I only want those neighbours that are accessible through mutation within a genome
-    true_neighbours <- neighbours[which(rowSums(mapply(`==`, neighbours[, (n+1):(n+s*n)], current_genotypes[[i]][, c((n+1):(n+s*n))])) == ncol(neighbours[, (n+1):(n+s*n)])),] # checking each allelic value at loci of interacting species against reference ("current genotype") and only accept, if all column match
+    true_neighbours <- neighbours[which(rowSums(mapply(`==`, neighbours[, (n+1):(n+s*n)], current_genotypes[[i]][, c((n+1):(n+s*n))])) == n*s),] # checking each allelic value at loci of interacting species against reference ("current genotype") and only accept, if all column match
     
     # filter those with higher or equal fitness than the current genotype
     neighbours_fitter <- true_neighbours[which(true_neighbours[, 2*n+(s*n)+1] >= current_genotypes[[i]][, 2*n+(s*n)+1]),]
@@ -812,7 +855,7 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     # first option - already at peak; then stay
     if (nrow(neighbours_fitter) == 0) {
       
-      new_genotypes[[i]] <- current_genotypes[[i]] # stay - maybe something will happen in another species
+      new_genotypes[[i]] <- current_genotypes[[i]][, c(1:(2*n+n*s+2))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
       
       # or there is only one high-fitness neighbor - go there directly
     } else if (nrow(neighbours_fitter) == 1) {
@@ -854,18 +897,24 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     current_genotypes <- new_genotypes
     step <- step+1
     
-    # stop if fitness for all species didn't change since last step
+    # stop if fitness for *all* species didn't change since last step
     stop_test <- NULL
+    
+    if (step > 2){
     
     for (i in 1:s_tot){
       
-      if (walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-1, 2*n+(s*n)+1]) {
+      if (walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-1, 2*n+(s*n)+1] &
+          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-2, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself
         
         stop_test <- c(stop_test, 1)
         
       }
       
     }
+    
+    }
+    
     
     if (length(stop_test) == s_tot) { break }
       
@@ -972,14 +1021,168 @@ visualise_walks <- function(adaptive_walks,
 
 ```
 
+# 7) Replicate the adaptive walks
+````{r replicates}
 
-# XX) test run
+assess_peaks <- function(n, # nb. of loci
+                         k, # nb. of loci interacting within genome (intragenomic epistasis)
+                         a, # nb. of alleles at each locus
+                         c, # nb. of loci interacting between genomes (intergenomic epistasis)
+                         s, # nb. of species interacting
+                         s_tot, # total nb. of species in system
+                         IM_k_reps, # nb. of replicates for intragenomic epistasis
+                         IM_k_type, # type of interaction matrix for intragenomic epistasis
+                         IM_c_reps, # nb. of replicates for intergenomic epistasis
+                         IM_c_type, # type of interaction matrix for intergenomic epistasis
+                         scape_reps, # nb. of replicates to generate fitness landscapes for each combination of IM_k and IM_c
+                         fitness_contrib, # how fitness contributions are drawn 
+                         fitness_calculation, # how fitness is calculated for genotypes
+                         fit_mean, # mean of fintess distribution when drawing from a normal distribution, or min fitness when drawing from a uniform distribution
+                         fit_sd, # sd of fitness distribution when drawing from a normal distribution, or max fitness when drawing from a uniform distribution
+                         walk_reps, # nb. of replicates of adaptive walks on a given landscape
+                         walk_type, # vector of types of adaptive walks (random, greedy, prop)
+                         walk_start, # starting genotype of adaptive walk (random or starting at reference type/WT)
+                         max_steps) # max nb. of steps in adaptive walk
+{
+
+# replicates of interaction matrices
+IM_k_replicated <- list()
+
+for (k_rep in 1:IM_k_reps){
+  
+  
+  IM_k_replicated[[k_rep]] <- build_IMk(IM = IM_k_type,
+                      n,
+                      k,
+                      s,
+                      s_tot)
+
+}
+ 
+IM_c_replicated <- list()
+  
+for (c_rep in 1:IM_c_reps){
+  
+  IM_c_replicated[[c_rep]] <- build_IMc(IM = IM_c_type,
+                      n,
+                      c,
+                      s,
+                      s_tot)
+}
+
+
+# for each combination of IM_k and IM_c make the landscapes and perform the random walks
+
+peaks_df <- NULL #I want to save the endpoints of all walks in one df
+
+for (k_rep in 1:IM_k_reps) {
+  
+  IM_k <- IM_k_replicated[[k_rep]]
+  
+  for (c_rep in 1:IM_c_reps){
+    
+    IM_c <- IM_c_replicated[[c_rep]]
+    
+    scapes_replicated <- list() # to store the landscapes
+  
+    # create the landscapes
+  for (scape_rep in 1:scape_reps) {
+    
+    scapes_replicated[[scape_rep]] <- build_landscape(IM_k,
+                             IM_c, 
+                fitness_contrib,
+                fitness_calculation,
+                n,
+                k,
+                a,
+                c,
+                s,
+                s_tot,
+                fit_mean,
+                fit_sd)
+    
+    # identify the global fitness peak
+    global_peaks <- list()
+    
+    for (global_peak in 1:s_tot){
+      
+      global_peaks[[global_peak]] <-  max(scapes_replicated[[scape_rep]][[global_peak]][,2*n+s*n+1])
+      
+    }
+    
+    # for each landscape perform the adaptive walks
+    for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
+
+    walks_replicated <- list()
+    
+    # perform the walk
+    for (walk_rep in 1:walk_reps) {
+      
+      walks_replicated[[walk_rep]] <- adaptive_walk(scapes_replicated[[scape_rep]], 
+              walk = walking,
+              n,
+              c,
+              s, 
+              s_tot, 
+              IM_c,
+              start = walk_start,
+              max_steps)
+      
+      # store the desired information (endpoint of walk and simulation parameters)
+      for (species in 1:s_tot) {
+        
+        start_seq <- paste(paste(walks_replicated[[walk_rep]][[species]][1, c(1:n)], collapse = ""), "-", c(paste(walks_replicated[[walk_rep]][[species]][1, c((n+1):(n+n*s))], collapse = ""))) # I want to save the starting point of each adaptive walk
+        
+        # and then keep track of the end points of each walk here; I am saving the end point of the walk alongside the simulation parameters
+        peaks_df <- rbind(peaks_df, cbind(walks_replicated[[walk_rep]][[species]][nrow(walks_replicated[[walk_rep]][[species]]),], data.frame(k_rep, 
+                                                                                                                                              c_rep, 
+                                                                                                                                              scape_rep, 
+                                                                                                                                              walk_rep, 
+                                                                                                                                              species,
+                                                                                                                                              n,
+                                                                                                                                              k,
+                                                                                                                                              a,
+                                                                                                                                              c,
+                                                                                                                                              s,
+                                                                                                                                              walk_start,
+                                                                                                                                              walking,
+                                                                                                                                              start_seq,
+                                                                                                                                              global_peak = global_peaks[[species]])))
+        
+      }
+      
+    }
+    }
+  
+  }
+    
+  }
+  
+}
+
+return(list(peaks_df, 
+            IM_k_replicated,
+            IM_c_replicated,
+            scapes_replicated,
+            walks_replicated))
+
+}
+
+
+````
+
+
+
+
+# XX) test runs
 ```{r test landscape}
 
+set.seed(1313)
+
 n = 2
-k = 1
+k = 0
 a = 2
-c = 1
+c = 0
 s = 1
 s_tot = 2
 
@@ -989,7 +1192,13 @@ IM_c <- build_IMc(IM = "R",
                       s,
                       s_tot)
 
-testscape <- build_landscape(IM_k = "R",
+IM_k <- build_IMk(IM = "R",
+                      n,
+                      k,
+                      s,
+                      s_tot)
+
+testscape <- build_landscape(IM_k,
                              IM_c, 
                 fitness_contrib = "N",
                 fitness_calculation = "KJ",
@@ -1008,22 +1217,14 @@ system_fig <- visualise_system(testscape,
                  s,
                  s_tot)
 
-ggsave(path = "./",
-       device = "pdf",
-       units = c("cm"),
-       width = 30,
-       height = 12,
-       filename = "NKCS_2111_sp1sp2.pdf",
-       plot = system_fig)
-
 walk_test <- adaptive_walk(testscape, 
-              walk = "prop",
+              walk = "random",
               n,
               c,
               s, 
               s_tot, 
               IM_c,
-              start = c("WT"),
+              start = c("R"),
               max_steps=100)
 
 walks_fig <- visualise_walks(walk_test,
@@ -1032,12 +1233,188 @@ walks_fig <- visualise_walks(walk_test,
                 s_tot,
                 testscape)
 
-ggsave(path = "./",
-       device = "pdf",
-       units = c("cm"),
-       width = 30,
-       height = 12,
-       filename = "NKCS_2111_sp1sp2_greedy.pdf",
-       plot = walks_fig)
 
- ```
+```
+#XX) test replication
+```{r test replication}
+
+set.seed(1313)
+
+n = 2
+a = 2
+s = 1
+s_tot = 2
+IM_k_reps = 1
+IM_k_type = "R"
+IM_c_type = "R"
+scape_reps = 10
+fitness_contrib = "N"
+fitness_calculation = "KJ"
+fit_mean = 0
+fit_sd = 0.5
+walk_reps = 10
+walk_type = c("greedy", "random", "prop")
+walk_start = "R"
+max_steps = 100
+
+peaks_nkcs_2111 <- assess_peaks(n, 
+                         k = 1,
+                         a, 
+                         c = 1, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 5, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2011 <- assess_peaks(n, 
+                         k = 0,
+                         a, 
+                         c = 1, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 5, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2101 <- assess_peaks(n, 
+                         k = 1,
+                         a, 
+                         c = 0, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 1, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_4101 <- assess_peaks(n = 4, 
+                         k = 1,
+                         a, 
+                         c = 0, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 1, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2001 <- assess_peaks(n, 
+                         k = 0,
+                         a, 
+                         c = 0, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 1, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_total <- rbind(peaks_nkcs_2001[[1]],
+                     peaks_nkcs_2011[[1]],
+                     peaks_nkcs_2101[[1]],
+                     peaks_nkcs_2111[[1]],
+                     peaks_nkcs_4101[[1]])
+
+peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak
+
+peaks_summarised <- as.data.frame(peaks_total[peaks_total$step < 100, ] |> 
+                            group_by(k, c, a, k_rep, c_rep, scape_rep, species, walking, reached) |>
+                            dplyr::summarise(count = n()))
+
+peaks_summarised$tot_reps <- walk_reps
+peaks_summarised$prop_reached <- peaks_summarised$count/peaks_summarised$tot_reps
+
+ggplot(peaks_summarised[peaks_summarised$reached == TRUE,],
+       aes(y = prop_reached,
+           x = interaction(a, k, c),
+           fill = walking)) +
+  geom_boxplot() +
+  theme_bw()
+
+ggplot(peaks_summarised[peaks_summarised$reached == TRUE,],
+       aes(y = prop_reached,
+           x = interaction(a, k, c),
+           col = walking,
+           shape = as.factor(species))) +
+  geom_jitter() +
+  theme_bw()
+
+ggplot(peaks_summarised[peaks_summarised$reached == TRUE,],
+       aes(y = prop_reached,
+           x = interaction(a, k, c),
+           fill = interaction(walking,as.factor(species)))) +
+  geom_boxplot() +
+  theme_bw()
+
+ggplot(peaks_total[peaks_total$reached == TRUE,],
+       aes(y = step,
+           x = interaction(k,a, c),
+           col = walking,
+           shape = as.factor(species))) +
+  geom_jitter() +
+  theme_bw()
+
+ggplot(peaks_total[peaks_total$reached == TRUE & peaks_total$step < 100,],
+       aes(y = step,
+           x = interaction(k, a, c),
+           col = walking,
+           shape = as.factor(species))) +
+  geom_jitter() +
+  theme_bw()
+
+ggplot(peaks_total[peaks_total$reached == TRUE & peaks_total$step < 100,],
+       aes(y = step,
+           x = interaction(k, a, c),
+           fill = walking)) +
+  geom_boxplot() +
+  theme_bw()
+
+```
