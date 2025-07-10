@@ -14,9 +14,11 @@ knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_sc
 ```{r libraries}
 rm (list = ls())
 
-library(ggplot2) 
+library(ggplot2) # for plotting
 library(gtools)
-library(dplyr) 
+library(dplyr) # for constructing the data sets
+#library(ggbeeswarm) # for plotting
+library(gghalves) # for plotting mixed boxplots with points
 
 ```
 
@@ -972,7 +974,10 @@ visualise_system <- function(landscapes,
                         values = c("solid", "dashed"))+
   xlab("Hamming distance from reference") +
   ylab("Fitness") +
-    facet_wrap(~species) +
+    facet_wrap(~species,
+               labeller = labeller(species = 
+    c("1" = "Species 1",
+      "2" = "Species 2"))) +
   theme_bw() +
   theme(legend.position = "none",
         panel.grid.major.y = element_blank(),
@@ -1014,7 +1019,10 @@ visualise_walks <- function(adaptive_walks,
     geom_hline(aes(yintercept = peak),
                linetype = "dashed",
                col = "firebrick3") +
-    facet_wrap(~species) +
+    facet_wrap(~species,
+               labeller = labeller(species = 
+    c("1" = "Species 1",
+      "2" = "Species 2"))) +
   theme_bw()
   
 }
@@ -1074,6 +1082,7 @@ for (c_rep in 1:IM_c_reps){
 # for each combination of IM_k and IM_c make the landscapes and perform the random walks
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
+total_walks <- list()
 
 for (k_rep in 1:IM_k_reps) {
   
@@ -1111,6 +1120,8 @@ for (k_rep in 1:IM_k_reps) {
     }
     
     # for each landscape perform the adaptive walks
+    total_walks[[scape_rep]] <- list()
+    
     for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
 
     walks_replicated <- list()
@@ -1152,6 +1163,9 @@ for (k_rep in 1:IM_k_reps) {
       }
       
     }
+    
+    total_walks[[scape_rep]][[match(walking, walk_type)]] <- walks_replicated
+    
     }
   
   }
@@ -1164,7 +1178,7 @@ return(list(peaks_df,
             IM_k_replicated,
             IM_c_replicated,
             scapes_replicated,
-            walks_replicated))
+            total_walks))
 
 }
 
@@ -1249,13 +1263,13 @@ s_tot = 2
 IM_k_reps = 1
 IM_k_type = "R"
 IM_c_type = "R"
-scape_reps = 20
+scape_reps = 50
 fitness_contrib = "N"
 fitness_calculation = "KJ"
 fit_mean = 0
 fit_sd = 0.5
-walk_reps = 20
-walk_type = c("greedy", "random", "prop")
+walk_reps = 30
+walk_type = c("greedy", "random")
 walk_start = "R"
 max_steps = 100
 
@@ -1359,105 +1373,105 @@ peaks_nkcs_2101 <- assess_peaks(n,
                          walk_start, 
                          max_steps)
 
-peaks_nkcs_3101 <- assess_peaks(n = 3,
-                         k = 1,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_3101 <- assess_peaks(n = 3,
+#                          k = 1,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
-peaks_nkcs_4101 <- assess_peaks(n = 4,
-                         k = 1,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_4101 <- assess_peaks(n = 4,
+#                          k = 1,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
-peaks_nkcs_3201 <- assess_peaks(n = 3, 
-                         k = 2,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps = 5, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_3201 <- assess_peaks(n = 3, 
+#                          k = 2,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps = 5, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
-peaks_nkcs_4201 <- assess_peaks(n = 4, 
-                         k = 2,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps = 5, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_4201 <- assess_peaks(n = 4, 
+#                          k = 2,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps = 5, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
-peaks_nkcs_4301 <- assess_peaks(n = 4, 
-                         k = 3,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps = 5, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_4301 <- assess_peaks(n = 4, 
+#                          k = 3,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps = 5, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
 peaks_nkcs_2001 <- assess_peaks(n, 
                          k = 0,
@@ -1479,53 +1493,53 @@ peaks_nkcs_2001 <- assess_peaks(n,
                          walk_start, 
                          max_steps)
 
-peaks_nkcs_3001 <- assess_peaks(n = 3, 
-                         k = 0,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_3001 <- assess_peaks(n = 3, 
+#                          k = 0,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
-peaks_nkcs_4001 <- assess_peaks(n = 4, 
-                         k = 0,
-                         a, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         max_steps)
+# peaks_nkcs_4001 <- assess_peaks(n = 4, 
+#                          k = 0,
+#                          a, 
+#                          c = 0, 
+#                          s, 
+#                          s_tot, 
+#                          IM_k_reps, 
+#                          IM_k_type,
+#                          IM_c_reps = 1, 
+#                          IM_c_type, 
+#                          scape_reps, 
+#                          fitness_contrib, 
+#                          fitness_calculation,
+#                          fit_mean, 
+#                          fit_sd, 
+#                          walk_reps, 
+#                          walk_type, 
+#                          walk_start, 
+#                          max_steps)
 
-peaks_total <- dplyr::bind_rows(peaks_nkcs_4301[[1]], #the bind_rows function allows me to bind df with different columns; missing values are filled with NA
-                                peaks_nkcs_4201[[1]],
-                                peaks_nkcs_4101[[1]],
-                                peaks_nkcs_4001[[1]],
-                                peaks_nkcs_3201[[1]],
-                                peaks_nkcs_3101[[1]],
-                                peaks_nkcs_3001[[1]],
+peaks_total <- dplyr::bind_rows(#peaks_nkcs_4301[[1]], #the bind_rows function allows me to bind df with different columns; missing values are filled with NA
+                                #peaks_nkcs_4201[[1]],
+                                #peaks_nkcs_4101[[1]],
+                                #peaks_nkcs_4001[[1]],
+                                #peaks_nkcs_3201[[1]],
+                                #peaks_nkcs_3101[[1]],
+                                #peaks_nkcs_3001[[1]],
                                 peaks_nkcs_2121[[1]],
                                 peaks_nkcs_2111[[1]],
                                 peaks_nkcs_2101[[1]],
@@ -1535,32 +1549,29 @@ peaks_total <- dplyr::bind_rows(peaks_nkcs_4301[[1]], #the bind_rows function al
 
 peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak
 
-peaks_summarised <- as.data.frame(peaks_total[peaks_total$step < 100, ] |> 
-                            group_by(k, c, n, k_rep, c_rep, scape_rep, species, walking, reached) |>
-                            dplyr::summarise(count = n()))
-
 peaks_total2 <- as.data.frame(peaks_total |> 
-                            group_by(k, c, n, k_rep, c_rep, scape_rep, step, walk_rep, walking) |>
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, step, walk_rep, walking) |>
                             dplyr::summarise(peaked = sum(reached))) 
 
-peaks_summarised2 <- as.data.frame(peaks_total2 |> 
-                            group_by(k, c, n, k_rep, c_rep, scape_rep, walking, peaked) |>
-                            dplyr::summarise(count = n()) |>
-  tidyr::complete(peaked = 0:2, fill = list(count = 0)))
-  
+peaks_total2[peaks_total2$step < max_steps, "pot_cycle"] <- 0 
+peaks_total2[peaks_total2$step == max_steps, "pot_cycle"] <- 1 # identify potential cycles
 
-peaks_summarised$tot_reps <- walk_reps
-peaks_summarised$prop_reached <- peaks_summarised$count/peaks_summarised$tot_reps
+peaks_summarised2 <- as.data.frame(peaks_total2 |> 
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, walking, peaked) |>
+                            dplyr::summarise(peak_count = n(),
+                                             cycle_count = sum(pot_cycle)) |>
+  tidyr::complete(peaked = 0:2, fill = list(peak_count = 0,
+                                            cycle_count = 0)))
 
 peaks_summarised2$tot_reps <- walk_reps
-peaks_summarised2$prop_reached <- peaks_summarised2$count/peaks_summarised2$tot_reps
+peaks_summarised2$prop_reached <- peaks_summarised2$peak_count/peaks_summarised2$tot_reps
+peaks_summarised2$prop_cycled <- peaks_summarised2$cycle_count/peaks_summarised2$tot_reps
 
-ggplot(peaks_summarised[peaks_summarised$reached == TRUE,],
-       aes(y = prop_reached,
-           x = interaction(n, k, c),
-           fill = walking)) +
-  geom_boxplot() +
-  theme_bw()
+peaks_summarised_cycles <- as.data.frame(peaks_summarised2 |> 
+                            dplyr::group_by(k, c, n, walking, k_rep, c_rep, peaked) |>
+                            dplyr::summarise(cycles_count = sum(cycle_count))) 
+
+peaks_summarised_cycles$prop_cycles <- peaks_summarised_cycles$cycles_count/(walk_reps*scape_reps)
 
 ggplot(peaks_summarised2,
         aes(y = prop_reached,
@@ -1569,15 +1580,49 @@ ggplot(peaks_summarised2,
      geom_boxplot() +
      theme_bw()
 
-ggplot(peaks_summarised[peaks_summarised$reached == TRUE,],
-       aes(y = prop_reached,
-           x = interaction(n, k, c),
-           col = walking,
-           shape = as.factor(species))) +
-  geom_jitter() +
-  theme_bw()
+ggplot(peaks_summarised2,
+        aes(y = prop_cycled,
+            x = interaction(peaked, n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
 
 ggplot(peaks_summarised2,
+        aes(y = prop_cycled,
+            x = interaction(n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised_cycles,
+        aes(y = prop_cycles,
+            x = interaction(peaked, n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised_cycles,
+        aes(y = cycles_count,
+            x = interaction(n, k, c),
+            fill = walking)) +
+     geom_jitter() +
+     theme_bw()
+
+ggplot(peaks_summarised2[peaks_summarised2$cycle_count > 0,],
+        aes(y = prop_cycled,
+            x = interaction(n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised2,
+        aes(y = prop_reached,
+            x = interaction(peaked, n, k, c),
+            col = walking)) +
+     geom_jitter() +
+     theme_bw()
+
+ggplot(peaks_summarised2[peaks_summarised2$steps_mean < max_steps,],
         aes(y = prop_reached,
             x = interaction(peaked, n, k, c),
             col = walking)) +
@@ -1592,14 +1637,6 @@ ggplot(peaks_total[peaks_total$reached == TRUE,],
   geom_jitter() +
   theme_bw()
 
-ggplot(peaks_total,
-       aes(y = step,
-           x = interaction(n, k, c),
-           col = walking,
-           shape = as.factor(species))) +
-  geom_jitter() +
-  theme_bw()
-
 ggplot(peaks_total2,
        aes(y = step,
            x = interaction(peaked, n, k, c),
@@ -1607,19 +1644,169 @@ ggplot(peaks_total2,
   geom_jitter() +
   theme_bw()
 
-ggplot(peaks_total[peaks_total$reached == TRUE & peaks_total$step < 100,],
-       aes(y = step,
-           x = interaction(n, k, c),
-           col = walking,
-           shape = as.factor(species))) +
-  geom_jitter() +
-  theme_bw()
 
-ggplot(peaks_total[peaks_total$reached == TRUE & peaks_total$step < 100,],
+ggplot(peaks_total2,
        aes(y = step,
-           x = interaction(n, k, c),
+           x = interaction(peaked, n, k, c),
            fill = walking)) +
-  geom_boxplot() +
+  geom_half_boxplot(nudge = 0.05, outlier.color = NA) +
+  geom_half_point() +
   theme_bw()
 
+
+```
+
+``` {r Poster figures}
+
+legend <- scale_colour_manual(values = c("#157F1F", "#FCA311", "#CB48B7"),
+                              breaks = c("greedy","prop", "random"),
+                              labels = c("greedy",
+                                         "weighted",
+                                         "random"),
+                              name="type of adaptive walk")
+
+poster_theme <- theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
+                        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=22),
+                      legend.text = element_text(size=15),
+                      legend.title = element_text(size=17),
+                      legend.position = "top")
+
+peak_fig <- ggplot(peaks_summarised2[peaks_summarised2$peaked == 2,],
+        aes(y = prop_reached,
+            x = interaction(n, k, c),
+            col = walking)) +
+     gghalves::geom_half_boxplot(nudge = 0.05,
+                                 fill = "grey80") +
+  gghalves::geom_half_point(position = "dodge2",
+                            transformation = position_jitter(w = 0.05, h = 0)) +
+  scale_x_discrete(labels=c("2.0.0" = "2-0-0", 
+                            "2.1.0" = "2-1-0",
+                            "2.0.1" = "2-0-1",
+                            "2.1.1" = "2-1-1",
+                            "2.0.2" = "2-0-2",
+                            "2.1.2" = "2-1-2")) +
+  ylab("Probability of both species reaching their global peak") +
+  xlab("N-K-C") +
+  legend +
+  theme_bw() +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 26,
+       height = 18.5,
+       filename = "peak_fig.pdf",
+       plot = peak_fig)
+
+step_fig <- ggplot(peaks_total2,
+       aes(y = step,
+           x = interaction(peaked, n, k, c),
+           col = walking)) +
+  gghalves::geom_half_boxplot(nudge = 0.05,
+                                 fill = "grey80") +
+  gghalves::geom_half_point(position = "dodge2",
+                            transformation = position_jitter(w = 0.05, h = 0)) +
+  scale_x_discrete(labels=c("2.2.0.0" = "2-0-0~2", 
+                            "0.2.1.0" = "2-1-0~0",
+                            "1.2.1.0" = "2-1-0~1",
+                            "2.2.1.0" = "2-1-0~2",
+                            "0.2.0.1" = "2-0-1~0",
+                            "1.2.0.1" = "2-0-1~1",
+                            "2.2.0.1" = "2-0-1~2",
+                            "0.2.1.1" = "2-1-1~0",
+                            "1.2.1.1" = "2-1-1~1",
+                            "2.2.1.1" = "2-1-1~2",
+                            "0.2.0.2" = "2-0-2~0",
+                            "1.2.0.2" = "2-0-2~1",
+                            "2.2.0.2" = "2-0-2~2",
+                            "0.2.1.2" = "2-1-2~0",
+                            "1.2.1.2" = "2-1-2~1",
+                            "2.2.1.2" = "2-1-2~2")) +
+  ylab("Steps in adaptive walk") +
+  xlab("N-K-C ~ nb. of species at global peak") +
+  legend +
+  theme_bw() +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 45,
+       height = 18,
+       filename = "step_fig.pdf",
+       plot = step_fig)
+
+cycle_fig <- ggplot(peaks_summarised_cycles,
+        aes(y = prop_cycles,
+            x = interaction(n, k, c),
+            col = walking)) +
+  gghalves::geom_half_boxplot(nudge = 0.05,
+                                 fill = "grey80") +
+  gghalves::geom_half_point(position = "dodge2",
+                            transformation = position_jitter(w = 0.05, h = 0)) +
+  scale_x_discrete(labels=c("2.0.0" = "2-0-0", 
+                            "2.1.0" = "2-1-0",
+                            "2.0.1" = "2-0-1",
+                            "2.1.1" = "2-1-1",
+                            "2.0.2" = "2-0-2",
+                            "2.1.2" = "2-1-2")) +
+  ylab("Probability of cycling") +
+  xlab("N-K-C") +
+  legend +
+  theme_bw() +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 26,
+       height = 18,
+       filename = "cycle_fig.pdf",
+       plot = cycle_fig)
+
+example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[22]],
+                 n,
+                 c,
+                 s,
+                 s_tot) +
+  theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
+                        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=22),
+                      legend.text = element_text(size=15),
+                      legend.title = element_text(size=17),
+        strip.text.x = element_text(size=17))
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 35,
+       height = 14,
+       filename = "example_scape_fig.pdf",
+       plot = example_scape_fig)
+
+walks_fig <- visualise_walks(peaks_nkcs_2111[[5]][[22]][[1]][[28]],
+                n,
+                s,
+                s_tot,
+                peaks_nkcs_2111[[4]][[22]]) +
+  theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
+                        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=22),
+                      legend.text = element_text(size=15),
+                      legend.title = element_text(size=17),
+        strip.text.x = element_text(size=17))
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 30,
+       height = 14,
+       filename = "walks_fig.pdf",
+       plot = walks_fig)
+ 
 ```
