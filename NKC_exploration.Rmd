@@ -1,0 +1,453 @@
+---
+title: "NKC_exploration"
+output: html_notebook
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
+```
+
+### Set up workspace
+```{r libraries}
+rm (list = ls())
+
+library(ggplot2) # for plotting
+library(gtools) # permutations to get all possible genotype combinations
+library(dplyr) # for constructing the data sets
+library(gghalves) # for plotting mixed boxplots with points
+
+# load NKC functions
+source(knitr::purl("NKC(S).Rmd", quiet=TRUE))
+
+```
+
+# 8) Let's let it rip!!
+## 8.1) comparing n = 2, k = 0,1, c = 0,1
+```{r n 2}
+set.seed(1313)
+
+n = 2
+a = 2
+s = 1
+s_tot = 2
+IM_k_reps = 1
+IM_k_type = "R"
+IM_c_type = "R"
+scape_reps = 50
+fitness_contrib = "N"
+fitness_calculation = "KJ"
+fit_mean = 0
+fit_sd = 0.5
+walk_reps = 30
+walk_type = c("greedy", "random")
+walk_start = "R"
+max_steps = 100
+
+peaks_nkcs_2111 <- assess_peaks(n, 
+                         k = 1,
+                         a, 
+                         c = 1, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 5, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2121 <- assess_peaks(n, 
+                         k = 1,
+                         a, 
+                         c = 2, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 5, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2011 <- assess_peaks(n, 
+                         k = 0,
+                         a, 
+                         c = 1, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 5, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2021 <- assess_peaks(n, 
+                         k = 0,
+                         a, 
+                         c = 2, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 5, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2101 <- assess_peaks(n, 
+                         k = 1,
+                         a, 
+                         c = 0, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 1, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_nkcs_2001 <- assess_peaks(n, 
+                         k = 0,
+                         a, 
+                         c = 0, 
+                         s, 
+                         s_tot, 
+                         IM_k_reps, 
+                         IM_k_type,
+                         IM_c_reps = 1, 
+                         IM_c_type, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         max_steps)
+
+peaks_total <- dplyr::bind_rows(peaks_nkcs_2121[[1]],
+                                peaks_nkcs_2111[[1]],
+                                peaks_nkcs_2101[[1]],
+                                peaks_nkcs_2021[[1]],
+                                peaks_nkcs_2011[[1]],
+                                peaks_nkcs_2001[[1]]) #the bind_rows function allows me to bind dfs with different columns; missing values are filled with NA; this is if I wanted to compare the effect of variable n for example
+
+peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak
+
+# save data
+save(peaks_total, file = "peaks_total")
+
+# group simulations by how many species reached their global peak (0/1/2)
+peaks_total2 <- as.data.frame(peaks_total |> 
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, step, walk_rep, walking) |>
+                            dplyr::summarise(peaked = sum(reached))) 
+
+# count potential cycles
+peaks_total2[peaks_total2$step < max_steps, "pot_cycle"] <- 0 
+peaks_total2[peaks_total2$step == max_steps, "pot_cycle"] <- 1 # identify potential cycles
+
+# summarise the adaptive walk replicates
+peaks_summarised2 <- as.data.frame(peaks_total2 |> 
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, walking, peaked) |>
+                            dplyr::summarise(peak_count = n(),
+                                             cycle_count = sum(pot_cycle)) |>
+  tidyr::complete(peaked = 0:2, fill = list(peak_count = 0,
+                                            cycle_count = 0))) # add events that did not occur to the df with count 0
+
+# calculate percentages 
+peaks_summarised2$tot_reps <- walk_reps
+peaks_summarised2$prop_reached <- peaks_summarised2$peak_count/peaks_summarised2$tot_reps
+peaks_summarised2$prop_cycled <- peaks_summarised2$cycle_count/peaks_summarised2$tot_reps
+
+# summarise cycling behaviour instead
+peaks_summarised_cycles <- as.data.frame(peaks_summarised2 |> 
+                            dplyr::group_by(k, c, n, walking, k_rep, c_rep, peaked) |>
+                            dplyr::summarise(cycles_count = sum(cycle_count))) 
+
+peaks_summarised_cycles$prop_cycles <- peaks_summarised_cycles$cycles_count/(walk_reps*scape_reps)
+
+# some exploratory plots
+ggplot(peaks_summarised2,
+        aes(y = prop_reached,
+            x = interaction(peaked, n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised2,
+        aes(y = prop_cycled,
+            x = interaction(peaked, n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised2,
+        aes(y = prop_cycled,
+            x = interaction(n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised_cycles,
+        aes(y = prop_cycles,
+            x = interaction(peaked, n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised_cycles,
+        aes(y = cycles_count,
+            x = interaction(n, k, c),
+            fill = walking)) +
+     geom_jitter() +
+     theme_bw()
+
+ggplot(peaks_summarised2[peaks_summarised2$cycle_count > 0,],
+        aes(y = prop_cycled,
+            x = interaction(n, k, c),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_summarised2,
+        aes(y = prop_reached,
+            x = interaction(peaked, n, k, c),
+            col = walking)) +
+     geom_jitter() +
+     theme_bw()
+
+ggplot(peaks_total[peaks_total$reached == TRUE,],
+       aes(y = step,
+           x = interaction(n, k, c),
+           col = walking,
+           shape = as.factor(species))) +
+  geom_jitter() +
+  theme_bw()
+
+ggplot(peaks_total2,
+       aes(y = step,
+           x = interaction(peaked, n, k, c),
+           col = walking)) +
+  geom_jitter() +
+  theme_bw()
+
+
+ggplot(peaks_total2,
+       aes(y = step,
+           x = interaction(peaked, n, k, c),
+           fill = walking)) +
+  geom_half_boxplot(nudge = 0.05, outlier.color = NA) +
+  geom_half_point() +
+  theme_bw()
+
+
+```
+
+``` {r Poster figures}
+
+legend <- scale_colour_manual(values = c("#157F1F", "#FCA311", "#CB48B7"),
+                              breaks = c("greedy","prop", "random"),
+                              labels = c("greedy",
+                                         "weighted",
+                                         "random"),
+                              name="type of adaptive walk")
+
+poster_theme <- theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
+                        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=22),
+                      legend.text = element_text(size=15),
+                      legend.title = element_text(size=17),
+                      legend.position = "top")
+
+peak_fig <- ggplot(peaks_summarised2[peaks_summarised2$peaked == 2,],
+        aes(y = prop_reached,
+            x = interaction(n, k, c),
+            col = walking)) +
+     gghalves::geom_half_boxplot(nudge = 0.05,
+                                 fill = "grey80") +
+  gghalves::geom_half_point(position = "dodge2",
+                            transformation = position_jitter(w = 0.05, h = 0)) +
+  scale_x_discrete(labels=c("2.0.0" = "2-0-0", 
+                            "2.1.0" = "2-1-0",
+                            "2.0.1" = "2-0-1",
+                            "2.1.1" = "2-1-1",
+                            "2.0.2" = "2-0-2",
+                            "2.1.2" = "2-1-2")) +
+  ylab("Probability of both species reaching their global peak") +
+  xlab("N-K-C") +
+  legend +
+  theme_bw() +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 26,
+       height = 18.5,
+       filename = "peak_fig.pdf",
+       plot = peak_fig)
+
+step_fig <- ggplot(peaks_total2,
+       aes(y = step,
+           x = interaction(peaked, n, k, c),
+           col = walking)) +
+  gghalves::geom_half_boxplot(nudge = 0.05,
+                                 fill = "grey80") +
+  gghalves::geom_half_point(position = "dodge2",
+                            transformation = position_jitter(w = 0.05, h = 0)) +
+  scale_x_discrete(labels=c("2.2.0.0" = "2-0-0~2", 
+                            "0.2.1.0" = "2-1-0~0",
+                            "1.2.1.0" = "2-1-0~1",
+                            "2.2.1.0" = "2-1-0~2",
+                            "0.2.0.1" = "2-0-1~0",
+                            "1.2.0.1" = "2-0-1~1",
+                            "2.2.0.1" = "2-0-1~2",
+                            "0.2.1.1" = "2-1-1~0",
+                            "1.2.1.1" = "2-1-1~1",
+                            "2.2.1.1" = "2-1-1~2",
+                            "0.2.0.2" = "2-0-2~0",
+                            "1.2.0.2" = "2-0-2~1",
+                            "2.2.0.2" = "2-0-2~2",
+                            "0.2.1.2" = "2-1-2~0",
+                            "1.2.1.2" = "2-1-2~1",
+                            "2.2.1.2" = "2-1-2~2")) +
+  ylab("Steps in adaptive walk") +
+  xlab("N-K-C ~ nb. of species at global peak") +
+  legend +
+  theme_bw() +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 45,
+       height = 18,
+       filename = "step_fig.pdf",
+       plot = step_fig)
+
+cycle_fig <- ggplot(peaks_summarised_cycles,
+        aes(y = prop_cycles,
+            x = interaction(n, k, c),
+            col = walking)) +
+  gghalves::geom_half_boxplot(nudge = 0.05,
+                                 fill = "grey80") +
+  gghalves::geom_half_point(position = "dodge2",
+                            transformation = position_jitter(w = 0.05, h = 0)) +
+  scale_x_discrete(labels=c("2.0.0" = "2-0-0", 
+                            "2.1.0" = "2-1-0",
+                            "2.0.1" = "2-0-1",
+                            "2.1.1" = "2-1-1",
+                            "2.0.2" = "2-0-2",
+                            "2.1.2" = "2-1-2")) +
+  ylab("Probability of cycling") +
+  xlab("N-K-C") +
+  legend +
+  theme_bw() +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 26,
+       height = 18,
+       filename = "cycle_fig.pdf",
+       plot = cycle_fig)
+
+example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[22]],
+                 n,
+                 c,
+                 s,
+                 s_tot) +
+  theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
+                        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=22),
+                      legend.text = element_text(size=15),
+                      legend.title = element_text(size=17),
+        strip.text.x = element_text(size=17))
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 35,
+       height = 14,
+       filename = "example_scape_fig.pdf",
+       plot = example_scape_fig)
+
+walks_fig <- visualise_walks(peaks_nkcs_2111[[5]][[22]][[1]][[28]],
+                n,
+                s,
+                s_tot,
+                peaks_nkcs_2111[[4]][[22]]) +
+  theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
+                        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=22),
+                      legend.text = element_text(size=15),
+                      legend.title = element_text(size=17),
+        strip.text.x = element_text(size=17))
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 30,
+       height = 14,
+       filename = "walks_fig.pdf",
+       plot = walks_fig)
+ 
+```
+
+```{r}
+test <- peaks_nkcs_2111[[4]][[22]]
+test_sp1 <- test[[1]]
+test_sp2 <- test[[2]]
+
+export_sp1 <- test_sp1[,c(1:4,7)]
+export_sp2 <- test_sp2[,c(1:4,7)]
+
+write.csv(export_sp1, "~/OneDrive - Universitaet Bern/NKC_project/sp1.csv", row.names=FALSE)
+write.csv(export_sp2, "~/OneDrive - Universitaet Bern/NKC_project/sp2.csv", row.names=FALSE)
+
+```
