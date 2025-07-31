@@ -20,7 +20,7 @@ library(dplyr) # for constructing the data sets
 library(gghalves) # for plotting mixed boxplots with points
 
 # load NKC functions
-source(knitr::purl("NKC(S).Rmd", quiet=TRUE))
+source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from the code chunks in the markdown file
 
 ```
 
@@ -176,7 +176,35 @@ peaks_total <- dplyr::bind_rows(peaks_nkcs_2121[[1]],
 peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak
 
 # save data
-save(peaks_total, file = "peaks_total")
+save(peaks_total,
+       peaks_nkcs_2121,
+       peaks_nkcs_2111,
+       peaks_nkcs_2101,
+       peaks_nkcs_2021,
+       peaks_nkcs_2011,
+       peaks_nkcs_2001, file = "peaks_total")
+
+```
+
+```{r}
+load("peaks_total")
+
+n = 2
+a = 2
+s = 1
+s_tot = 2
+IM_k_reps = 1
+IM_k_type = "R"
+IM_c_type = "R"
+scape_reps = 50
+fitness_contrib = "N"
+fitness_calculation = "KJ"
+fit_mean = 0
+fit_sd = 0.5
+walk_reps = 30
+walk_type = c("greedy", "random")
+walk_start = "R"
+max_steps = 100
 
 # group simulations by how many species reached their global peak (0/1/2)
 peaks_total2 <- as.data.frame(peaks_total |> 
@@ -193,7 +221,7 @@ peaks_summarised2 <- as.data.frame(peaks_total2 |>
                             dplyr::summarise(peak_count = n(),
                                              cycle_count = sum(pot_cycle)) |>
   tidyr::complete(peaked = 0:2, fill = list(peak_count = 0,
-                                            cycle_count = 0))) # add events that did not occur to the df with count 0
+                                            cycle_count = 0))) # add events that did not occur to the df with count 0 to get probabilities of events
 
 # calculate percentages 
 peaks_summarised2$tot_reps <- walk_reps
@@ -280,7 +308,6 @@ ggplot(peaks_total2,
   geom_half_boxplot(nudge = 0.05, outlier.color = NA) +
   geom_half_point() +
   theme_bw()
-
 
 ```
 

@@ -1082,6 +1082,7 @@ for (c_rep in 1:IM_c_reps){
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
 total_walks <- list()
+total_walks[[c_rep]] <- list()
 
 for (k_rep in 1:IM_k_reps) {
   
@@ -1092,11 +1093,12 @@ for (k_rep in 1:IM_k_reps) {
     IM_c <- IM_c_replicated[[c_rep]]
     
     scapes_replicated <- list() # to store the landscapes
+    scapes_replicated[[c_rep]] <- list() # I want to save the landscapes for each combination of k and c matrix (only C is variable for now)
   
     # create the landscapes
   for (scape_rep in 1:scape_reps) {
     
-    scapes_replicated[[scape_rep]] <- build_landscape(IM_k,
+    scapes_replicated[[c_rep]][[scape_rep]] <- build_landscape(IM_k,
                              IM_c, 
                 fitness_contrib,
                 fitness_calculation,
@@ -1114,12 +1116,12 @@ for (k_rep in 1:IM_k_reps) {
     
     for (global_peak in 1:s_tot){
       
-      global_peaks[[global_peak]] <-  max(scapes_replicated[[scape_rep]][[global_peak]][,2*n+s*n+1])
+      global_peaks[[global_peak]] <-  max(scapes_replicated[[c_rep]][[scape_rep]][[global_peak]][,2*n+s*n+1])
       
     }
     
     # for each landscape perform the adaptive walks
-    total_walks[[scape_rep]] <- list()
+    total_walks[[c_rep]][[scape_rep]] <- list()
     
     for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
 
@@ -1128,7 +1130,7 @@ for (k_rep in 1:IM_k_reps) {
     # perform the walk
     for (walk_rep in 1:walk_reps) {
       
-      walks_replicated[[walk_rep]] <- adaptive_walk(scapes_replicated[[scape_rep]], 
+      walks_replicated[[walk_rep]] <- adaptive_walk(scapes_replicated[[c_rep]][[scape_rep]], 
               walk = walking,
               n,
               c,
@@ -1163,7 +1165,7 @@ for (k_rep in 1:IM_k_reps) {
       
     }
     
-    total_walks[[scape_rep]][[match(walking, walk_type)]] <- walks_replicated
+    total_walks[[c_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
     
     }
   
