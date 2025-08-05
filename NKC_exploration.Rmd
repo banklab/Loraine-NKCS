@@ -25,7 +25,7 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 ```
 
 # 8) Let's let it rip!!
-## 8.1) comparing n = 2, k = 0,1, c = 0,1
+## 8.1) comparing n = 2, k = 0,1, c = 0,1,2
 ```{r n 2}
 set.seed(1313)
 
@@ -320,12 +320,11 @@ legend <- scale_colour_manual(values = c("#157F1F", "#FCA311", "#CB48B7"),
                                          "random"),
                               name="type of adaptive walk")
 
-poster_theme <- theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
-                        axis.text.x.bottom = element_text(size=16),
+poster_theme <- theme(axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
-                        axis.title = element_text(size=22),
+                        axis.title = element_text(size=25),
                       legend.text = element_text(size=15),
-                      legend.title = element_text(size=17),
+                      legend.title = element_text(size=20),
                       legend.position = "top")
 
 peak_fig <- ggplot(peaks_summarised2[peaks_summarised2$peaked == 2,],
@@ -333,7 +332,7 @@ peak_fig <- ggplot(peaks_summarised2[peaks_summarised2$peaked == 2,],
             x = interaction(n, k, c),
             col = walking)) +
      gghalves::geom_half_boxplot(nudge = 0.05,
-                                 fill = "grey80") +
+                                 fill = "grey90") +
   gghalves::geom_half_point(position = "dodge2",
                             transformation = position_jitter(w = 0.05, h = 0)) +
   scale_x_discrete(labels=c("2.0.0" = "2-0-0", 
@@ -346,7 +345,8 @@ peak_fig <- ggplot(peaks_summarised2[peaks_summarised2$peaked == 2,],
   xlab("N-K-C") +
   legend +
   theme_bw() +
-  poster_theme
+  poster_theme +
+  theme(axis.title.y = element_text(size = 22))
 
 ggsave(path = "../Figures/",
        device = "pdf",
@@ -422,18 +422,15 @@ ggsave(path = "../Figures/",
        filename = "cycle_fig.pdf",
        plot = cycle_fig)
 
-example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[22]],
+example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[5]][[22]], # this is just a pair of landscapes I chose because they lead to cycling
                  n,
                  c,
                  s,
                  s_tot) +
-  theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
-                        axis.text.x.bottom = element_text(size=16),
+  theme(axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
-                        axis.title = element_text(size=22),
-                      legend.text = element_text(size=15),
-                      legend.title = element_text(size=17),
-        strip.text.x = element_text(size=17))
+                        axis.title = element_text(size=25 ),
+        strip.text.x = element_text(size=25))
 
 ggsave(path = "../Figures/",
        device = "pdf",
@@ -443,18 +440,15 @@ ggsave(path = "../Figures/",
        filename = "example_scape_fig.pdf",
        plot = example_scape_fig)
 
-walks_fig <- visualise_walks(peaks_nkcs_2111[[5]][[22]][[1]][[28]],
+walks_fig <- visualise_walks(peaks_nkcs_2111[[5]][[5]][[22]][[1]][[28]], # these are the adaptive walks (cycling) that go with the example I chose (greedy walk)
                 n,
                 s,
                 s_tot,
-                peaks_nkcs_2111[[4]][[22]]) +
-  theme(axis.text.x.top = element_text(colour = "grey40", size = 12),
-                        axis.text.x.bottom = element_text(size=16),
+                peaks_nkcs_2111[[4]][[5]][[22]]) + # this is the matching pair of landscapes
+  theme(axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
-                        axis.title = element_text(size=22),
-                      legend.text = element_text(size=15),
-                      legend.title = element_text(size=17),
-        strip.text.x = element_text(size=17))
+                        axis.title = element_text(size=25),,
+        strip.text.x = element_text(size=25))
 
 ggsave(path = "../Figures/",
        device = "pdf",
@@ -467,14 +461,6 @@ ggsave(path = "../Figures/",
 ```
 
 ```{r}
-test <- peaks_nkcs_2111[[4]][[22]]
-test_sp1 <- test[[1]]
-test_sp2 <- test[[2]]
 
-export_sp1 <- test_sp1[,c(1:4,7)]
-export_sp2 <- test_sp2[,c(1:4,7)]
-
-write.csv(export_sp1, "~/OneDrive - Universitaet Bern/NKC_project/sp1.csv", row.names=FALSE)
-write.csv(export_sp2, "~/OneDrive - Universitaet Bern/NKC_project/sp2.csv", row.names=FALSE)
 
 ```

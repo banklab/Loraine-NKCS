@@ -12,7 +12,6 @@ knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_sc
 
 ### Set up workspace
 ```{r libraries}
-rm (list = ls())
 
 library(ggplot2) # for plotting
 library(gtools) # permutations to get all possible genotype combinations
@@ -598,7 +597,7 @@ build_landscape <- function(IM_k, # intragenomic epistasis matrices
       
       # for each genotype we look up the fitness contribution (h) at each locus; h depends on k+1+c*s loci 
       # for each locus:
-      for (l in 1:n) { # skipping "k" to iterate over, since k is used as a variable
+      for (l in 1:n) { # skipping "k" to iterate over, since k is used as a variable in the model
         
         # which loci determine the fitness contribution at this locus?
         interesting_loci_k <- which(IM_k[[i]][l, ] != 0) # based on the intragenomic IM
@@ -935,7 +934,7 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
 ```
 
 
-# 6) visualise the whole system 
+# 6) Visualise the system (coupled landscapes and walks)
 ```{r visualise systems and adaptive walks}
 
 visualise_system <- function(landscapes,
@@ -966,9 +965,13 @@ visualise_system <- function(landscapes,
             aes(group = group,
                 linetype = mut),
             color="grey80",
-            linewidth = 0.7) +
+            linewidth = 0.9) +
   geom_label(label = visual_scapes_df$seq,
-             aes(col = seq)) +
+             aes(col = seq),
+             label.size = 0.6, # thickness of label border in mm
+             size = 4.5, # size of label in mm
+             fontface = "bold" # bold font
+             ) +
   scale_linetype_manual(breaks = c("intra", "inter"),
                         values = c("solid", "dashed"))+
   xlab("Hamming distance from reference") +
@@ -1014,10 +1017,11 @@ visualise_walks <- function(adaptive_walks,
   ggplot(walks_df,
        aes(x = step,
            y = Fitness)) +
-  geom_line() +
+  geom_line(linewidth = 0.8) +
     geom_hline(aes(yintercept = peak),
                linetype = "dashed",
-               col = "firebrick3") +
+               col = "firebrick3",
+               linewidth = 0.9) +
     facet_wrap(~species,
                labeller = labeller(species = 
     c("1" = "Species 1",
@@ -1068,6 +1072,9 @@ for (k_rep in 1:IM_k_reps){
  
 IM_c_replicated <- list()
   
+total_walks <- list()
+scapes_replicated <- list() # to store the landscapes
+
 for (c_rep in 1:IM_c_reps){
   
   IM_c_replicated[[c_rep]] <- build_IMc(IM = IM_c_type,
@@ -1081,7 +1088,6 @@ for (c_rep in 1:IM_c_reps){
 # for each combination of IM_k and IM_c make the landscapes and perform the random walks
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
-total_walks <- list()
 total_walks[[c_rep]] <- list()
 
 for (k_rep in 1:IM_k_reps) {
@@ -1092,7 +1098,6 @@ for (k_rep in 1:IM_k_reps) {
     
     IM_c <- IM_c_replicated[[c_rep]]
     
-    scapes_replicated <- list() # to store the landscapes
     scapes_replicated[[c_rep]] <- list() # I want to save the landscapes for each combination of k and c matrix (only C is variable for now)
   
     # create the landscapes
