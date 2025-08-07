@@ -643,6 +643,9 @@ build_landscape <- function(IM_k, # intragenomic epistasis matrices
     colnames(genotype_table_species[[i]])[(n+(s*n)+1):(2*n+(s*n))] <- paste0("h.", 1:n) # fitness contributions of each locus
     colnames(genotype_table_species[[i]])[2*n+(s*n)+1] <- "fitness"
     
+    # adding peak rank information
+    genotype_table_species[[i]]$rank <- dplyr::dense_rank(-genotype_table_species[[i]]$fitness) # highest fitness will have rank 1
+    
   }
   
   return(genotype_table_species)
@@ -658,8 +661,8 @@ This will include mutations that can happen within a focal species genome but al
 ```{r neighbour search}
 
 findNeighbours <- function(landscape, 
-                           startIndex,
-                           nb_loci){ # focal genotype to start neighbour search with
+                           startIndex, # focal genotype to start neighbour search with
+                           nb_loci){ 
   
   # focal genotype
   temp_genotype <- landscape[startIndex,]
@@ -855,7 +858,7 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     # first option - already at peak; then stay
     if (nrow(neighbours_fitter) == 0) {
       
-      new_genotypes[[i]] <- current_genotypes[[i]][, c(1:(2*n+n*s+2))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
+      new_genotypes[[i]] <- current_genotypes[[i]][, c(1:(2*n+n*s+3))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
       
       # or there is only one high-fitness neighbor - go there directly
     } else if (nrow(neighbours_fitter) == 1) {
@@ -1198,9 +1201,9 @@ return(list(peaks_df,
 # set.seed(1313)
 # 
 # n = 2
-# k = 0
+# k = 1
 # a = 2
-# c = 0
+# c = 1
 # s = 1
 # s_tot = 2
 # 
@@ -1217,7 +1220,7 @@ return(list(peaks_df,
 #                       s_tot)
 # 
 # testscape <- build_landscape(IM_k,
-#                              IM_c, 
+#                              IM_c,
 #                 fitness_contrib = "N",
 #                 fitness_calculation = "KJ",
 #                 n,
@@ -1235,12 +1238,12 @@ return(list(peaks_df,
 #                  s,
 #                  s_tot)
 # 
-# walk_test <- adaptive_walk(testscape, 
+# walk_test <- adaptive_walk(testscape,
 #               walk = "random",
 #               n,
 #               c,
-#               s, 
-#               s_tot, 
+#               s,
+#               s_tot,
 #               IM_c,
 #               start = c("R"),
 #               max_steps=100)
