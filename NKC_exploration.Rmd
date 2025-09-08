@@ -173,7 +173,7 @@ peaks_total <- dplyr::bind_rows(peaks_nkcs_2121[[1]],
                                 peaks_nkcs_2011[[1]],
                                 peaks_nkcs_2001[[1]]) #the bind_rows function allows me to bind dfs with different columns; missing values are filled with NA; this is if I wanted to compare the effect of variable n for example
 
-peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak
+peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak # I can also just check if rank == 1
 
 # save data
 save(peaks_total,
@@ -234,6 +234,20 @@ peaks_summarised_cycles <- as.data.frame(peaks_summarised2 |>
                             dplyr::summarise(cycles_count = sum(cycle_count))) 
 
 peaks_summarised_cycles$prop_cycles <- peaks_summarised_cycles$cycles_count/(walk_reps*scape_reps)
+
+# group simulations by peak rank instead
+peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < 100,] |> 
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, walking, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+# |>
+#                               tidyr::complete(rank = 1:16, 
+#                                               fill = list(rank_peaked = 0))
+
+# calculate percentages 
+peaks_total_ranked_summarised$tot_reps <- walk_reps
+peaks_total_ranked_summarised$prop_rank_peaked <- peaks_total_ranked_summarised$rank_peaked/peaks_total_ranked_summarised$tot_reps
+
 
 # some exploratory plots
 ggplot(peaks_summarised2,
@@ -308,6 +322,57 @@ ggplot(peaks_total2,
   geom_half_boxplot(nudge = 0.05, outlier.color = NA) +
   geom_half_point() +
   theme_bw()
+
+ggplot(peaks_total_ranked_summarised,
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = interaction(rank, walking),
+            fill = walking)) +
+     geom_boxplot() +
+     theme_bw()
+
+ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$k == 0 &
+                                       peaks_total_ranked_summarised$c == 1,],
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = interaction(rank, walking),
+            fill = walking)) +
+     geom_boxplot() +
+  scale_x_continuous(breaks = c(1:16), limits=c(0.5, 16.5)) +
+     theme_bw()
+
+ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$k == 0 &
+                                       peaks_total_ranked_summarised$c == 1,],
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = interaction(rank, walking),
+            fill = walking)) +
+     geom_boxplot() +
+  geom_jitter() +
+  scale_x_continuous(breaks = c(1:16), limits=c(0.5, 16.5)) +
+     theme_bw()
+
+ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$k == 1 &
+                                       peaks_total_ranked_summarised$c == 0,],
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = interaction(rank, walking),
+            fill = walking)) +
+     geom_boxplot() +
+  geom_jitter() +
+  scale_x_continuous(breaks = c(1:16), limits=c(0.5, 16.5)) +
+     theme_bw()
+
+ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$k == 1 &
+                                       peaks_total_ranked_summarised$c == 1,],
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = interaction(rank, walking),
+            fill = walking)) +
+     geom_boxplot() +
+  geom_jitter() +
+  scale_x_continuous(breaks = c(1:16), limits=c(0.5, 16.5)) +
+     theme_bw()
 
 ```
 
@@ -462,5 +527,29 @@ ggsave(path = "../Figures/",
 
 ```{r}
 
+test_df <- peaks_nkcs_2111[[1]]
+filtered_test_df <- test_df[test_df$c_rep == 2 & test_df$scape_rep == 13,]
+
+ggplot(filtered_test_df[filtered_test_df$step < 100,],
+       aes(x = ID,
+           fill = walking)) +
+  geom_histogram(position = "dodge") +
+  scale_x_continuous(breaks = c(1:16), limits=c(1, 16)) +
+  theme_bw() +
+  facet_wrap(~species,
+               labeller = labeller(species = 
+    c("1" = "Species 1",
+      "2" = "Species 2")))
+
+walk_df <- peaks_nkcs_2111[[5]][[2]][[13]][[1]][[9]][[1]]
+
+ggplot(walk_df,
+       aes(x = step,
+           y = ID)) +
+  geom_line() +
+  geom_point(aes(col = fitness),
+             size = 3) +
+  scale_y_continuous(breaks = c(1:16), limits=c(1, 16)) +
+  theme_bw()
 
 ```

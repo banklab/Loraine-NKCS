@@ -1,0 +1,116 @@
+---
+title: "Network_Stuff"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
+```
+
+I'm trying out some newwork stuff by following this statnet turorial https://statnet.org/workshop-intro-sna-tools/
+
+### Set up workspace
+```{r libraries}
+#install.packages(c("network", "sna", "igraph", "tidygraph", "ggraph", 
+#                   "intergraph", "remotes"))
+#remotes::install_bioc("graph")
+
+library(network)
+library(sna)
+library(igraph)
+library(tidygraph)
+#library(ggraph)
+library(intergraph)
+library(remotes)
+library(graph)
+
+
+
+```
+
+
+
+```{r}
+# Making an adjacency matrix (which metagenotypes can mutate into each other?)
+x <- as.data.frame(gtools::permutations(2, 4, c(1:2), repeats = TRUE))
+x$ID <- 1:16
+
+adj_mat <- matrix(16, 16, data = rep(0, 16^2))
+
+for (i in 1:16) {
+  
+  adj_mat[i,findNeighbours(x, i, 4)$ID] <- 1
+  
+}
+
+# the issue I have right now is, that technically the metagenotypes differe from the pov from the focal species I have at a given time -> need to stick to a single focal species
+
+```
+
+
+```{r}
+# translating my adaptive walks into something I can use here (maybe?)
+# I need to extract the transitions from my adaptive walks -> format: from - to - in how many replicates of walk
+
+
+walks_dfs <- NULL
+for (i in 1:walk_reps){
+  
+ temp_df <- peaks_nkcs_2111[[5]][[5]][[22]][[1]][[i]]
+ 
+ IDs <- NULL
+ 
+ for (j in 0:max(temp_df[[1]][,"step"])) {
+   
+    metagenotype <- temp_df[[1]][temp_df[[1]]$step == j, c("F.1", "F.2", "P.1", "P.2")]
+ ID_temp <- x[rowSums(mapply(`==`, x[, c("V1", "V2", "V3", "V4")], metagenotype)) == 4, "ID"] # extract the ID of the metagenotype that matches my adjacency matrix IDs
+ 
+ IDs <- c(IDs, ID_temp)
+   
+ }
+ 
+ from_IDs <- IDs[1:(length(IDs)-1)]
+ to_IDs <- IDs[2:length(IDs)]
+ 
+ temp_df <- data.frame(from = from_IDs,
+                       to = to_IDs,
+                      step = temp_df[[1]][c(2:nrow(temp_df[[1]])),"step"],
+                       focal = temp_df[[1]][c(2:nrow(temp_df[[1]])),"focal"],
+                       walk = i)
+ 
+ walks_dfs <- rbind(walks_dfs, temp_df)
+  
+}
+
+walks_dfs_summed <- as.data.frame(walks_dfs |> 
+                            dplyr::group_by(from, to, focal, walk) |>
+                            dplyr::summarise(step_count = n()))
+
+walks_dfs_summed2 <- as.data.frame(walks_dfs_summed |> 
+                            dplyr::group_by(from, to, focal) |>
+                            dplyr::summarise(rep_count = n())) # this gives me in how many replicates certain steps were taken from x to y given a certain focal species
+
+
+```
+
+```{r}
+
+relations <- network(adj_mat)
+summary(relations) # Get an overall summary
+
+edgeNet <- network(walks_dfs_summed2, 
+                   matrix.type="edgelist",
+                   loops = TRUE,
+                   multiple = TRUE)
+edgeNet
+edgeNet[,]
+
+gplot(relations)
+
+plot(edgeNet, 
+     displaylabels=T,
+     displayisolates = T)
+
+````
