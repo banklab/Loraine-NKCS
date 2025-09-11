@@ -17,16 +17,7 @@ I'm trying out some newwork stuff by following this statnet turorial https://sta
 #                   "intergraph", "remotes"))
 #remotes::install_bioc("graph")
 
-library(network)
-library(sna)
-library(igraph)
-library(tidygraph)
-#library(ggraph)
-library(intergraph)
-library(remotes)
-library(graph)
-
-
+library(ggraph)
 
 ```
 
@@ -112,5 +103,32 @@ gplot(relations)
 plot(edgeNet, 
      displaylabels=T,
      displayisolates = T)
+
+g <- graph_from_data_frame(walks_dfs_summed2, 
+                           directed = TRUE)
+
+# assign node sizes (aggregated per node if necessary)
+V(g)$count <- ave(walks_dfs_summed2$rep_count, walks_dfs_summed2$from, FUN = max)[match(V(g)$name, walks_dfs_summed2$from)]
+
+ggraph(g) +
+  geom_edge_fan(aes(color = as.factor(focal)), # different edge color for the different steps based on focal species
+                 arrow = arrow(type = "closed",
+                 angle = 20, # "width" of arrow tip
+                 length = unit(4, "mm")), # length of arrow tip
+                 end_cap = circle(4, "mm")) +     # buffer between node and arrow
+  geom_edge_loop(aes(color = as.factor(focal),
+                     strength = (3*focal/4)),
+                 arrow = arrow(type = "closed",
+                               angle = 20,
+                 length = unit(4, "mm")),
+                 end_cap = circle(4, "mm")) +
+  geom_node_point(aes(size = count),
+                  shape = 21, 
+                  stroke = 1,
+                  fill = 'white', 
+                  color = 'black') +
+  geom_node_text(aes(label = name)) +                   # "name" is automatically generated from the node IDs in the edges
+  scale_size(range = c(4, 15)) +
+  theme_void()
 
 ````
