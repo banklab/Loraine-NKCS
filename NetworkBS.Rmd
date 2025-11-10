@@ -19,6 +19,8 @@ I'm trying out some newwork stuff by following this statnet turorial https://sta
 
 library(ggraph)
 library(igraph)
+library(gtools)
+library(dplyr)
 
 ```
 
@@ -38,6 +40,7 @@ for (i in 1:16) {
 }
 
 # the issue I have right now is, that technically the metagenotypes differe from the pov from the focal species I have at a given time -> need to stick to a single focal species
+# turn out I don't actually need this rn
 
 ```
 
@@ -48,9 +51,9 @@ for (i in 1:16) {
 
 
 walks_dfs <- NULL
-for (i in 1:walk_reps){
+for (i in 1:48){
   
- temp_df <- peaks_nkcs_2111[[5]][[5]][[22]][[1]][[i]]
+ temp_df <- peaks_nkcs_2111[[5]][[2]][[40]][[1]][[i]]
  
  IDs <- NULL
  
@@ -92,28 +95,92 @@ walks_dfs_summed2 <- as.data.frame(walks_dfs_summed |>
 g <- igraph::graph_from_data_frame(walks_dfs_summed2, 
                            directed = TRUE)
 
-# assign node sizes (aggregated per node if necessary)
+# add metadata to the nodes in the network (here "averaged per node")
 igraph::V(g)$count <- ave(walks_dfs_summed2$rep_count, walks_dfs_summed2$from, FUN = max)[match(V(g)$name, walks_dfs_summed2$from)]
 
-ggraph::ggraph(g) +
-  geom_edge_fan(aes(color = as.factor(focal)), # different edge color for the different steps based on focal species
-                 arrow = arrow(type = "closed",
-                 angle = 20, # "width" of arrow tip
-                 length = unit(4, "mm")), # length of arrow tip
-                 end_cap = circle(4, "mm")) +     # buffer between node and arrow
-  geom_edge_loop(aes(color = as.factor(focal),
-                     strength = (3*focal/4)),
+ranks_sp1 <- peaks_nkcs_2111[[4]][[2]][[40]][[1]]$rank
+test_df <- peaks_nkcs_2111[[4]][[2]][[40]][[2]]
+ranks_sp2 <- test_df[order(test_df$P.1, test_df$P.2, test_df$F.1, test_df$F.2), "rank"]
+
+igraph::V(g)$rank_sp1 <- ranks_sp1
+igraph::V(g)$rank_sp2 <- ranks_sp2
+
+
+graph <- ggraph::ggraph(g,
+               layout = "stress") +
+  geom_edge_fan(aes(linetype = as.factor(focal)), # different edge color for the different steps based on focal species
+                 end_cap = circle(5, "mm"), # buffer between node and arrow
+                colour = "grey40") + 
+  geom_edge_fan(arrow = arrow(type = "closed", # make arrow heads separately so they all have solid outlines
+                              angle = 20, # "width" of arrow tip
+                              length = unit(4, "mm")), # length of arrow tip
+                edge_width = 0,
+                 end_cap = circle(5, "mm"), # buffer between node and arrow
+                colour = "grey40") + 
+  geom_edge_loop(aes(linetype = as.factor(focal),
+                     strength = (3*focal/4)), # to make non-overlapping loops
+                 end_cap = circle(4, "mm"),
+                colour = "grey40") +
+  geom_edge_loop(aes(strength = (3*focal/4)), # make arrow heads separately so they all have solid outlines
                  arrow = arrow(type = "closed",
                                angle = 20,
                  length = unit(4, "mm")),
-                 end_cap = circle(4, "mm")) +
-  geom_node_point(aes(size = count),
-                  shape = 21, 
-                  stroke = 1,
-                  fill = 'white', 
-                  color = 'black') +
-  geom_node_text(aes(label = name)) +                   # "name" is automatically generated from the node IDs in the edges
-  scale_size(range = c(4, 15)) +
-  theme_void()
+                 edge_width = 0,
+                 end_cap = circle(4, "mm"),
+                colour = "grey40") +
+  geom_node_arc_bar(aes(x0 = x,
+                        y0 = y,
+                        r0 = 0, 
+                        r = count/300 + 0.1,
+                       start = pi, 
+                       end = 2*pi,
+                       fill = rank_sp1),
+                       colour = "white") + # left semicircle
+  geom_node_arc_bar(aes(x0 = x,
+                        y0 = y,
+                        r0 = 0, 
+                        r = count/300 + 0.1, 
+                        start = 0, 
+                        end = pi,
+                       fill = rank_sp2),
+                       colour = "white") + # right semicircle
+  #geom_node_text(aes(label = name)) +                   # "name" is automatically generated from the node IDs in the edges; then adjust r0 o read text
+  scale_size(range = c(5, 15),
+             guide = "none") +
+  scale_edge_linetype_manual(values = c("solid", "dashed"),
+                             name = "focal species") +
+  scale_fill_gradient2(name = "fitness rank",
+                         low = "#5d36f7",
+                         high = "#f9db45",
+                         mid = "#f274f0",
+                         midpoint = mean(ranks_sp1), # to adjust midpoint for landscapes with more or less peaks
+                         guide = "colourbar",
+                         aesthetics = "fill",
+                         transform = "reverse",
+                       breaks = c(1, 4, 8, 12, 16)) +
+  theme_void() +
+  theme(text=element_text(family="Helvetica")) +
+  guides(edge_linetype = guide_legend(position = "top"))
+
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 15,
+       height = 12,
+       filename = "graph_NKC_211_2_30.pdf",
+       plot = graph)
+
+# ggraph::ggraph(adj_mat) +
+#   geom_edge_fan(arrow = arrow(type = "closed",
+#                  angle = 20, # "width" of arrow tip
+#                  length = unit(4, "mm")), # length of arrow tip
+#                  end_cap = circle(4, "mm")) +  
+#   geom_node_point(shape = 21, 
+#                   stroke = 1,
+#                   fill = 'white', 
+#                   color = 'black',
+#                   size = 7) +
+#   theme_void()
 
 ````

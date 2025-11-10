@@ -24,9 +24,9 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 
 ```
 
-# 8) Let's let it rip!!
-## 8.1) comparing n = 2, k = 0,1, c = 0,1,2
-```{r n 2}
+# 1) Let's let it rip!!
+## 1.1) defining parameters
+```{r parameters}
 set.seed(1313)
 
 n = 2
@@ -41,10 +41,223 @@ fitness_contrib = "N"
 fitness_calculation = "KJ"
 fit_mean = 0
 fit_sd = 0.5
-walk_reps = 30
-walk_type = c("greedy", "random")
-walk_start = "R"
+walk_reps = 48
+walk_type = c("greedy")
+walk_start = "S"
 max_steps = 100
+
+metatypes_n2 <- gtools::permutations(2, 4, c(1:2), repeats = TRUE)
+metaseqs_n2 <- split(metatypes_n2, row(metatypes_n2))
+metaseqs_n2 <- lapply(metaseqs_n2, as.numeric)
+
+metatypes_n4 <- gtools::permutations(2, 8, c(1:2), repeats = TRUE)
+metaseqs_n4 <- split(metatypes_n4, row(metatypes_n4))
+metaseqs_n4 <- lapply(metaseqs_n4, as.numeric)
+
+
+# defining all the interaction matrices outside the simulations for more reproducibility
+## K
+IM_k0_n2 <- list(build_IMk(IM = "R",
+                      2,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_k0_n4 <- list(build_IMk(IM = "R",
+                      4,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_k1_n2 <- list(build_IMk(IM = "R",
+                      2,
+                      1,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_k3_n4 <- list(build_IMk(IM = "R",
+                      4,
+                      3,
+                      s,
+                      s_tot)) # only one possible layout
+
+# replicates of interaction matrices
+# K = 1
+IM_k1_n4 <- list()
+
+# random
+IM_k1_n4[[1]] <- build_IMk(IM = "R",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+# modular
+IM_k1_n4[[2]] <- build_IMk(IM = "M",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+# nearest neighbour
+IM_k1_n4[[3]] <- list()
+IM_k1_n4[[3]][[1]] <- matrix(c(1,1,0,0,
+                               0,1,1,0,
+                               0,0,1,1,
+                               1,0,0,1), 4, 4, byrow = TRUE)
+IM_k1_n4[[3]][[2]] <- matrix(c(1,1,0,0,
+                               0,1,1,0,
+                               0,0,1,1,
+                               1,0,0,1), 4, 4, byrow = TRUE)
+
+# preferential
+IM_k1_n4[[4]] <- build_IMk(IM = "P",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+# hierarchical
+IM_k1_n4[[5]] <- build_IMk(IM = "H",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+
+# K = 2
+IM_k2_n4 <- list()
+
+# random
+IM_k2_n4[[1]] <- build_IMk(IM = "R",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+# modular
+IM_k2_n4[[2]] <- list()
+IM_k2_n4[[2]][[1]] <- matrix(c(1,1,1,0,
+                               1,1,1,0,
+                               1,1,1,0,
+                               0,1,1,1), 4, 4, byrow = TRUE)
+IM_k2_n4[[2]][[2]] <- matrix(c(1,1,1,0,
+                               1,1,1,0,
+                               1,1,1,0,
+                               0,1,1,1), 4, 4, byrow = TRUE)
+
+# nearest neighbour
+IM_k2_n4[[3]] <- build_IMk(IM = "N",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+# preferential
+IM_k2_n4[[4]] <- build_IMk(IM = "P",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+# hierarchical
+IM_k2_n4[[5]] <- build_IMk(IM = "H",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+## C
+IM_c0_n2 <- list(build_IMc(IM = "R",
+                      2,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_c2_n2 <- list(build_IMc(IM = "R",
+                      2,
+                      2,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_c0_n4 <- list(build_IMc(IM = "R",
+                      4,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+# C = 1
+IM_c1_n2 <- list()
+
+# symmetric
+# only one locus involved in intergenomic epistasis
+IM_c1_n2[[1]] <- list()
+IM_c1_n2[[1]][[1]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+IM_c1_n2[[1]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+
+# all loci involved in interaction
+IM_c1_n2[[2]] <- list()
+IM_c1_n2[[2]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[2]][[2]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+
+# asymmetric 
+# interaction with only one locus in the other species
+IM_c1_n2[[3]] <- list()
+IM_c1_n2[[3]][[1]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+IM_c1_n2[[3]][[2]] <- matrix(c(0, 0, 1 , 1), 2, 2)
+
+# all loci involved in interaction
+IM_c1_n2[[4]] <- list()
+IM_c1_n2[[4]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[4]][[2]] <- matrix(c(0, 1, 1 , 0), 2, 2)
+
+# all loci involved in interaction for one species; only one locus for the other
+IM_c1_n2[[5]] <- list()
+IM_c1_n2[[5]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[5]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+```
+
+
+# 1.2 running the simulations
+```{r simulations}
+
+peaks_nkcs_2121 <- assess_peaks(n, 
+                         k = 1,
+                         a, 
+                         c = 2, 
+                         s, 
+                         s_tot, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c2_n2,
+                         scape_reps = 250, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2021 <- assess_peaks(n, 
+                         k = 0,
+                         a, 
+                         c = 2, 
+                         s, 
+                         s_tot, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c2_n2, 
+                         scape_reps = 250, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
 
 peaks_nkcs_2111 <- assess_peaks(n, 
                          k = 1,
@@ -52,10 +265,8 @@ peaks_nkcs_2111 <- assess_peaks(n,
                          c = 1, 
                          s, 
                          s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 5, 
-                         IM_c_type, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c1_n2, 
                          scape_reps, 
                          fitness_contrib, 
                          fitness_calculation,
@@ -64,48 +275,8 @@ peaks_nkcs_2111 <- assess_peaks(n,
                          walk_reps, 
                          walk_type, 
                          walk_start, 
+                         start_seqs = metaseqs_n2,
                          max_steps)
-
-peaks_nkcs_2111 <- assess_peaks(n, 
-                         k = 1,
-                         a, 
-                         c = 1, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 5, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps = 5, 
-                         walk_type, 
-                         walk_start = "S",
-                         start_seq = list(c(1,1,1,1), c(1,1,1,2)),
-                         max_steps)
-
-# peaks_nkcs_2121 <- assess_peaks(n, 
-#                          k = 1,
-#                          a, 
-#                          c = 2, 
-#                          s, 
-#                          s_tot, 
-#                          IM_k_reps, 
-#                          IM_k_type,
-#                          IM_c_reps = 5, 
-#                          IM_c_type, 
-#                          scape_reps, 
-#                          fitness_contrib, 
-#                          fitness_calculation,
-#                          fit_mean, 
-#                          fit_sd, 
-#                          walk_reps, 
-#                          walk_type, 
-#                          walk_start, 
-#                          max_steps)
 
 peaks_nkcs_2011 <- assess_peaks(n, 
                          k = 0,
@@ -113,10 +284,8 @@ peaks_nkcs_2011 <- assess_peaks(n,
                          c = 1, 
                          s, 
                          s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 5, 
-                         IM_c_type, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c1_n2, 
                          scape_reps, 
                          fitness_contrib, 
                          fitness_calculation,
@@ -125,27 +294,8 @@ peaks_nkcs_2011 <- assess_peaks(n,
                          walk_reps, 
                          walk_type, 
                          walk_start, 
+                         start_seqs = metaseqs_n2,
                          max_steps)
-
-# peaks_nkcs_2021 <- assess_peaks(n, 
-#                          k = 0,
-#                          a, 
-#                          c = 2, 
-#                          s, 
-#                          s_tot, 
-#                          IM_k_reps, 
-#                          IM_k_type,
-#                          IM_c_reps = 5, 
-#                          IM_c_type, 
-#                          scape_reps, 
-#                          fitness_contrib, 
-#                          fitness_calculation,
-#                          fit_mean, 
-#                          fit_sd, 
-#                          walk_reps, 
-#                          walk_type, 
-#                          walk_start, 
-#                          max_steps)
 
 peaks_nkcs_2101 <- assess_peaks(n, 
                          k = 1,
@@ -153,11 +303,9 @@ peaks_nkcs_2101 <- assess_peaks(n,
                          c = 0, 
                          s, 
                          s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c0_n2, 
+                         scape_reps = 250, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -165,6 +313,7 @@ peaks_nkcs_2101 <- assess_peaks(n,
                          walk_reps, 
                          walk_type, 
                          walk_start, 
+                         start_seqs = metaseqs_n2,
                          max_steps)
 
 peaks_nkcs_2001 <- assess_peaks(n, 
@@ -173,38 +322,17 @@ peaks_nkcs_2001 <- assess_peaks(n,
                          c = 0, 
                          s, 
                          s_tot, 
-                         IM_k_reps, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c0_n2,
+                         scape_reps = 250, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
                          fit_sd, 
                          walk_reps, 
                          walk_type, 
-                         walk_start, 
-                         max_steps)
-
-peaks_nkcs_21014 <- assess_peaks(n = 2, 
-                         k = 1,
-                         a = 4, 
-                         c = 0, 
-                         s, 
-                         s_tot, 
-                         IM_k_reps = 1, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
-                         scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
+                         walk_start,
+                         start_seqs = metaseqs_n2,
                          max_steps)
 
 peaks_nkcs_4101 <- assess_peaks(n = 4, 
@@ -213,10 +341,8 @@ peaks_nkcs_4101 <- assess_peaks(n = 4,
                          c = 0, 
                          s, 
                          s_tot, 
-                         IM_k_reps = 5, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
+                         IM_ks = IM_k1_n4,
+                         IM_cs = IM_c0_n4, 
                          scape_reps, 
                          fitness_contrib, 
                          fitness_calculation,
@@ -224,7 +350,8 @@ peaks_nkcs_4101 <- assess_peaks(n = 4,
                          fit_sd, 
                          walk_reps, 
                          walk_type, 
-                         walk_start, 
+                         walk_start,
+                         start_seqs = metaseqs_n4, 
                          max_steps)
 
 peaks_nkcs_4201 <- assess_peaks(n = 4, 
@@ -233,10 +360,8 @@ peaks_nkcs_4201 <- assess_peaks(n = 4,
                          c = 0, 
                          s, 
                          s_tot, 
-                         IM_k_reps = 5, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
+                         IM_ks = IM_k2_n4,
+                         IM_cs = IM_c0_n4,
                          scape_reps, 
                          fitness_contrib, 
                          fitness_calculation,
@@ -244,7 +369,8 @@ peaks_nkcs_4201 <- assess_peaks(n = 4,
                          fit_sd, 
                          walk_reps, 
                          walk_type, 
-                         walk_start, 
+                         walk_start,
+                         start_seqs = metaseqs_n4,
                          max_steps)
 
 peaks_nkcs_4301 <- assess_peaks(n = 4, 
@@ -253,10 +379,8 @@ peaks_nkcs_4301 <- assess_peaks(n = 4,
                          c = 0, 
                          s, 
                          s_tot, 
-                         IM_k_reps = 5, 
-                         IM_k_type,
-                         IM_c_reps = 1, 
-                         IM_c_type, 
+                         IM_ks = IM_k3_n4,
+                         IM_cs = IM_c0_n4,
                          scape_reps, 
                          fitness_contrib, 
                          fitness_calculation,
@@ -264,7 +388,8 @@ peaks_nkcs_4301 <- assess_peaks(n = 4,
                          fit_sd, 
                          walk_reps, 
                          walk_type, 
-                         walk_start, 
+                         walk_start,
+                         start_seqs = metaseqs_n4, 
                          max_steps)
 
 peaks_total <- dplyr::bind_rows(peaks_nkcs_4101[[1]],
@@ -275,8 +400,7 @@ peaks_total <- dplyr::bind_rows(peaks_nkcs_4101[[1]],
                                 peaks_nkcs_2101[[1]],
                                 peaks_nkcs_2021[[1]],
                                 peaks_nkcs_2011[[1]],
-                                peaks_nkcs_2001[[1]],
-                                peaks_nkcs_21014[[1]]) #the bind_rows function allows me to bind dfs with different columns; missing values are filled with NA; this is if I wanted to compare the effect of variable n for example
+                                peaks_nkcs_2001[[1]]) #the bind_rows function allows me to bind dfs with different columns; missing values are filled with NA; this is if I wanted to compare the effect of variable n for example
 
 peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak # I could also just check if rank == 1
 
@@ -290,11 +414,11 @@ save(peaks_total,
       peaks_nkcs_2101,
       peaks_nkcs_2021,
       peaks_nkcs_2011,
-      peaks_nkcs_2001,
-      peaks_nkcs_21014, file = "peaks_total")
+      peaks_nkcs_2001, file = "peaks_total")
 
 ```
 
+## 1.2) summarising the results
 ```{r}
 load("peaks_total")
 
@@ -307,7 +431,7 @@ fitness_contrib = "N"
 fitness_calculation = "KJ"
 fit_mean = 0
 fit_sd = 0.5
-walk_reps = 30
+walk_reps = 48
 walk_type = c("greedy", "random")
 walk_start = "R"
 max_steps = 100
@@ -349,7 +473,7 @@ peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < 10
 peaks_total_cycle_summarised <- as.data.frame(peaks_total[peaks_total$step == 100,] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
                             dplyr::summarise(cycle_count = n())) 
-peaks_total_cycle_summarised$rank <- "cycles"
+peaks_total_cycle_summarised$rank <- 17
 
 peaks_total_ranked_summarised <- merge(peaks_total_ranked_summarised, 
       peaks_total_cycle_summarised, 
@@ -359,8 +483,10 @@ peaks_total_ranked_summarised <- merge(peaks_total_ranked_summarised,
 peaks_total_ranked_summarised$tot_reps <- walk_reps
 peaks_total_ranked_summarised$prop_rank_peaked <- peaks_total_ranked_summarised$rank_peaked/peaks_total_ranked_summarised$tot_reps
 peaks_total_ranked_summarised$prop_cycle <- peaks_total_ranked_summarised$cycle_count/peaks_total_ranked_summarised$tot_reps
+```
 
-
+# 2) Exploratory plots
+```{r}
 ### some exploratory plots
 
 # how many species reach the global peak (0/1/2)
@@ -428,10 +554,12 @@ ggplot(peaks_total2,
 # legends
 poster_theme <- theme(axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
-                        axis.title = element_text(size=25),
+                        axis.title = element_text(size=24),
                       legend.text = element_text(size=15),
                       legend.title = element_text(size=20),
-                      legend.position = "top")
+                      legend.position = "top",
+                      strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0))
 
   # annotate("text",
   #          x = seq(0.8, 12.8, 1),
@@ -440,12 +568,12 @@ poster_theme <- theme(axis.text.x.bottom = element_text(size=16),
   #          col = "#157F1F",
   #          vjust = - 1)
 
-ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+big_plot_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$a == 2 &
                                        peaks_total_ranked_summarised$walking == "greedy",],
         aes(y = prop_rank_peaked,
             x = rank,
-            group = interaction(rank, walking))) +
+            group = rank)) +
   geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
                group = 1),
            fill = "grey85") + # across all my groupings
@@ -453,59 +581,81 @@ ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
   geom_violin(aes(y = prop_cycle,
                   x = rank),
               col = "grey") +
-  geom_jitter(aes(col = as.factor(c_rep),
-                  shape = as.factor(species)),
-              alpha = 0.6,
-              size = 1.5) +
+  geom_jitter(aes(col = as.factor(c_rep)),
+              size = 1.5,
+              height = 0.01) +
   geom_jitter(aes(y = prop_cycle,
                   x = rank,
-                  col = as.factor(c_rep),
-                  shape = as.factor(species)),
-              alpha = 0.6,
-              size = 1.5) +
-  stat_summary(fun.y = median,
+                  col = as.factor(c_rep)),
+              size = 1.5,
+              height = 0.01) +
+  stat_summary(fun.y = mean,
                geom = "crossbar",
-               size = 0.3,
+               linewidth = 0.3,
                col = "grey30") +
   stat_summary(aes(y = prop_cycle,
                   x = rank),
-               fun.y = median,
+               fun.y = mean,
                geom = "crossbar",
-               size = 0.3,
+               linewidth = 0.3,
                col = "grey30") +
-  ylab("Proportion of adaptive walks/landscape") +
      theme_bw() +
-  ggtitle("N = 2") +
   facet_grid(c ~ k) +
-  scale_x_discrete(limits = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "cycles")) +
-  theme(panel.grid.minor.x = element_blank()) +
+  labs(col = "interaction matrix (C)") +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "cycles"),
+                     breaks = c(1:17),
+                   name = "fitness rank",
+                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "proportion of adaptive walks/landscape",
+                   sec.axis = sec_axis(~ . , name = "C", breaks = NULL, labels = NULL)) +
+  theme(panel.grid.minor.x = element_blank(),
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5)) +
   poster_theme
 
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 45,
+       height = 24,
+       filename = "big_plot_N2.pdf",
+       plot = big_plot_N2)
 
-ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
+plot_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
                                        peaks_total_ranked_summarised$walking == "greedy",],
         aes(y = prop_rank_peaked,
             x = rank,
             group = interaction(rank, walking))) +
      geom_violin(col = "grey") +
-  geom_jitter(aes(col = as.factor(k_rep)),
-                  alpha = 0.6,
+  geom_jitter(aes(col = as.factor(k_rep),
+                  shape = as.factor(species)),
               size = 1.5) +
   stat_summary(fun.y = median,
                geom = "crossbar",
                size = 0.3,
-               col = "firebrick") +
-  scale_x_continuous(breaks = c(1:16), limits=c(0.5, 16.5),
-                     sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
+               col = "grey30") +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "cycles"),
+                     breaks = c(1:17),
+                   name = "fitness rank",
+                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
   ylab("Proportion of adaptive walks/landscape") +
      theme_bw() +
-  ggtitle("N = 4") +
   facet_grid( ~ k) +
+  labs(shape = "species",
+       col = "interaction matrix (K)") +
   theme(panel.grid.minor = element_blank()) +
   poster_theme
 
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 45,
+       height = 15,
+       filename = "plot_N4.pdf",
+       plot = plot_N4)
+
 ```
 
+## 2.1) Plots I put on my GRS/GRC poster
 ``` {r Poster figures}
 
 legend <- scale_colour_manual(values = c("#157F1F", "#FCA311", "#CB48B7"),
@@ -656,6 +806,7 @@ ggsave(path = "../Figures/",
 ```
 
 
+## 2.2) exploring the adaptive walks
 trying to find differences between effect of C and K by looking at the rank of the endpoints
 ```{r}
 
@@ -868,4 +1019,92 @@ for (i in 2:walk_reps) {
   
 }
 
- ```
+```
+ 
+## 3) Trying some linear models
+```{r}
+
+test_data1 <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                       peaks_total_ranked_summarised$a == 2 &
+                                       peaks_total_ranked_summarised$walking == "greedy",]
+
+test_data <- peaks_total[peaks_total$n == 2 &
+                         peaks_total$a == 2 &
+                           peaks_total$walking == "greedy" &
+                           peaks_total$step < 100,]
+
+test_data3 <- peaks_total[peaks_total$n == 2 &
+                         peaks_total$a == 2 &
+                           peaks_total$walking == "greedy",]
+
+test_data3$cycle <- "N"
+test_data3[test_data3$step == 100, "cycle"] <- "Y"
+
+library(nnet)
+
+model <- nnet::multinom(as.factor(rank) ~ as.factor(k) * as.factor(c), data = test_data)
+#sum_mod <- summary(model)
+
+coef_df <- tidy(model) %>%
+  mutate(
+    OR  = exp(estimate),                 # odds ratio
+    OR_low  = exp(estimate - 1.96*std.error), # 95% CI lower
+    OR_high = exp(estimate + 1.96*std.error)  # 95% CI upper
+  )  %>%
+  filter(term != "(Intercept)") %>%      # drop intercepts
+  mutate(predictor = term,
+         Rank   = factor(y.level, levels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16")))
+
+ggplot(coef_df, 
+       aes(x = predictor, 
+           y = OR, 
+           color = Rank)) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "grey40") +
+  geom_point(position = position_dodge(width = 0.7), 
+             size = 3) +
+  geom_errorbar(aes(ymin = OR_low, 
+                    ymax = OR_high),
+                width = 0.2,
+                position = position_dodge(width = 0.7)) +
+  scale_y_log10() +   # << log-transformed axis
+  theme_bw(base_size = 14) +
+  labs(y = "log(Odds ratio)", x = "") +
+  scale_x_discrete(labels = c("as.factor(c)1" = "C = 1",
+                              "as.factor(c)2" = "C = 2",
+                              "as.factor(k)1" = "K = 1",
+                              "as.factor(k)1:as.factor(c)1" = "C = 1:K = 1",
+                              "as.factor(k)1:as.factor(c)2" = "C = 2:K = 1")) 
+
+model_cycle <- glm(as.factor(cycle) ~ as.factor(k) * as.factor(c) * as.factor(c_rep),
+             data = test_data3,
+             family = binomial(link = "logit"))
+
+coef_df <- tidy(model_cycle) %>%
+  mutate(
+    OR  = exp(estimate),                 # odds ratio
+    OR_low  = exp(estimate - 1.96*std.error), # 95% CI lower
+    OR_high = exp(estimate + 1.96*std.error)  # 95% CI upper
+  )  %>%
+  filter(term != "(Intercept)") 
+
+ggplot(coef_df, 
+       aes(x = term, 
+           y = OR)) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "grey40") +
+  geom_point(position = position_dodge(width = 0.7), 
+             size = 3) +
+  geom_errorbar(aes(ymin = OR_low, 
+                    ymax = OR_high),
+                width = 0.2,
+                position = position_dodge(width = 0.7)) +
+  scale_y_log10() +   # << log-transformed axis
+  theme_bw(base_size = 14) +
+  labs(y = "log(Odds ratio)", x = "") +
+  scale_x_discrete(labels = c("as.factor(c)1" = "C = 1",
+                              "as.factor(c)2" = "C = 2",
+                              "as.factor(k)1" = "K = 1",
+                              "as.factor(k)1:as.factor(c)1" = "C = 1:K = 1",
+                              "as.factor(k)1:as.factor(c)2" = "C = 2:K = 1")) 
+
+
+```

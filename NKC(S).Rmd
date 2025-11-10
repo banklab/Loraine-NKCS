@@ -783,7 +783,8 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
                           s, # nb. of species interacting
                           s_tot, # total number of species in the system
                           IM_c,
-                          start = c("WT", "R"), # choosing starting genotype
+                          start = c("WT", "R", "S"), # choosing starting genotype
+                          desired_start, # if I want to start at a specific genotype (start = "S")
                           max_steps=100) # max. number of steps on the landscape before I interrupt
 {
   
@@ -823,6 +824,24 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
       temp_seq[(n+1):(n+n*s)] <- random_seq[-c((1+(i-1)*n):(n+(i-1)*n))] # these are the allelic values for the loci in the interacting species
 
       walks[[i]] <- landscape_df[[i]][rowSums(mapply(`==`, landscape_df[[i]][, 1:(n+n*s)], temp_seq)) == n+n*s,] # this will give us the starting point of the adaptive walk; I'm matching the entry in the genotype table to the random sequence I generated earlier here
+      walks[[i]]$step <- 0 # to signalise that this is the initial genotype
+      walks[[i]]$focal <- NA # later I can store the ID of the focal species (the species that is mutating)
+      
+    }
+    
+  }
+  
+  if (start == "S"){
+    
+    specific_seq <- desired_start # this is to plug in the desired starting sequence
+    
+    for (i in 1:s_tot){
+      temp_seq <- NA # here I will store the sequence for each species; this will be updated as the positions of loci in the sequence will change for each species (focal species always at the start of the sequence)
+
+      temp_seq[1:n] <- specific_seq[(1+(i-1)*n):(n+(i-1)*n)] # these are the allelic values for the loci in the focal species
+      temp_seq[(n+1):(n+n*s)] <- specific_seq[-c((1+(i-1)*n):(n+(i-1)*n))] # these are the allelic values for the loci in the interacting species
+
+      walks[[i]] <- landscape_df[[i]][rowSums(mapply(`==`, landscape_df[[i]][, 1:(n+n*s)], temp_seq)) == n+n*s,] # this will give us the starting point of the adaptive walk; I'm matching the entry in the genotype table to the desired sequence
       walks[[i]]$step <- 0 # to signalise that this is the initial genotype
       walks[[i]]$focal <- NA # later I can store the ID of the focal species (the species that is mutating)
       
@@ -1044,10 +1063,8 @@ assess_peaks <- function(n, # nb. of loci
                          c, # nb. of loci interacting between genomes (intergenomic epistasis)
                          s, # nb. of species interacting
                          s_tot, # total nb. of species in system
-                         IM_k_reps, # nb. of replicates for intragenomic epistasis
-                         IM_k_type, # type of interaction matrix for intragenomic epistasis
-                         IM_c_reps, # nb. of replicates for intergenomic epistasis
-                         IM_c_type, # type of interaction matrix for intergenomic epistasis
+                         IM_ks, # list of intragenomic epistasis interaction matrices
+                         IM_cs, # list of intergenomic epistasis interaction matrices
                          scape_reps, # nb. of replicates to generate fitness landscapes for each combination of IM_k and IM_c
                          fitness_contrib, # how fitness contributions are drawn 
                          fitness_calculation, # how fitness is calculated for genotypes
@@ -1055,51 +1072,31 @@ assess_peaks <- function(n, # nb. of loci
                          fit_sd, # sd of fitness distribution when drawing from a normal distribution, or max fitness when drawing from a uniform distribution
                          walk_reps, # nb. of replicates of adaptive walks on a given landscape
                          walk_type, # vector of types of adaptive walks (random, greedy, prop)
-                         walk_start, # starting genotype of adaptive walk (random or starting at reference type/WT)
+                         walk_start, # starting genotype of adaptive walk (random, starting at reference type/WT, or starting at a specified sequence)
+                         start_seqs, # if I want to specify where the adaptive walk starts -> supplied as a list
                          max_steps) # max nb. of steps in adaptive walk
 {
 
-# replicates of interaction matrices
-IM_k_replicated <- list()
-
-for (k_rep in 1:IM_k_reps){
-  
-  
-  IM_k_replicated[[k_rep]] <- build_IMk(IM = IM_k_type,
-                      n,
-                      k,
-                      s,
-                      s_tot)
-
-}
+# get number of replicates for intragenomic epistasis interaction matrix
+  IM_k_reps <- length(IM_ks)
  
-IM_c_replicated <- list()
-  
+# get number of replicates for intergenomic epistasis interaction matrix
+  IM_c_reps <- length(IM_cs)
+
+# for each combination of IM_k and IM_c make the landscapes and perform the random walks
 total_walks <- list()
 scapes_replicated <- list() # to store the landscapes
 
-for (c_rep in 1:IM_c_reps){
-  
-  IM_c_replicated[[c_rep]] <- build_IMc(IM = IM_c_type,
-                      n,
-                      c,
-                      s,
-                      s_tot)
-}
-
-
-# for each combination of IM_k and IM_c make the landscapes and perform the random walks
-
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
-total_walks[[c_rep]] <- list()
+total_walks[[IM_c_reps]] <- list()
 
 for (k_rep in 1:IM_k_reps) {
   
-  IM_k <- IM_k_replicated[[k_rep]]
+  IM_k <- IM_ks[[k_rep]]
   
   for (c_rep in 1:IM_c_reps){
     
-    IM_c <- IM_c_replicated[[c_rep]]
+    IM_c <- IM_cs[[c_rep]]
     
     scapes_replicated[[c_rep]] <- list() # I want to save the landscapes for each combination of k and c matrix (only C is variable for now)
   
@@ -1138,6 +1135,12 @@ for (k_rep in 1:IM_k_reps) {
     # perform the walk
     for (walk_rep in 1:walk_reps) {
       
+      if (walk_start == "S"){
+        
+        desired_start <- start_seqs[[walk_rep %% length(start_seqs) + 1]]
+          
+        }
+      
       walks_replicated[[walk_rep]] <- adaptive_walk(scapes_replicated[[c_rep]][[scape_rep]], 
               walk = walking,
               n,
@@ -1146,6 +1149,7 @@ for (k_rep in 1:IM_k_reps) {
               s_tot, 
               IM_c,
               start = walk_start,
+              desired_start,
               max_steps)
       
       # store the desired information (endpoint of walk and simulation parameters)
@@ -1184,8 +1188,8 @@ for (k_rep in 1:IM_k_reps) {
 }
 
 return(list(peaks_df, 
-            IM_k_replicated,
-            IM_c_replicated,
+            IM_ks,
+            IM_cs,
             scapes_replicated,
             total_walks))
 
