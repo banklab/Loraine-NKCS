@@ -18,6 +18,7 @@ library(ggplot2) # for plotting
 library(gtools) # permutations to get all possible genotype combinations
 library(dplyr) # for constructing the data sets
 library(gghalves) # for plotting mixed boxplots with points
+library(ggtext) # to get different colour axis titles
 
 # load NKC functions
 source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from the code chunks in the markdown file
@@ -29,27 +30,27 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 ```{r parameters}
 set.seed(1313)
 
-n = 2
-a = 2
-s = 1
-s_tot = 2
-IM_k_reps = 1
-IM_k_type = "R"
-IM_c_type = "R"
-scape_reps = 50
-fitness_contrib = "N"
-fitness_calculation = "KJ"
-fit_mean = 0
-fit_sd = 0.5
-walk_reps = 48
-walk_type = c("greedy")
-walk_start = "S"
-max_steps = 100
+n = 2 # number of loci in each genome
+a = 2 # number of alleles at each locus
+s = 1 # number of species interacting
+s_tot = 2 # total number of species in the community
+IM_k_reps = 1 # number of replicates for intragenomic interactions
+scape_reps = 50 # number of landscape replicates
+fitness_contrib = "N" # distribution from which we draw fitness contributions
+fitness_calculation = "KJ" # way to calculate genotype fitness 
+fit_mean = 0 # mean of distribution from which we draw fitness contribution
+fit_sd = 0.5 # sd of distribution from which we draw fitness contribution
+walk_reps = 48 # number of replicates for adaptive walks on a fitness landscape
+walk_type = c("greedy", "random", "prop") # types of adaptive walks implemented
+walk_start = "S" # where to start the adaptive walks (R - Random, WT - wildtype, S - specified)
+max_steps = 100 # max number of steps in the adaptive walk
 
+# defining the starting sequences for N = 2
 metatypes_n2 <- gtools::permutations(2, 4, c(1:2), repeats = TRUE)
 metaseqs_n2 <- split(metatypes_n2, row(metatypes_n2))
 metaseqs_n2 <- lapply(metaseqs_n2, as.numeric)
 
+# defining the starting sequences for N = 4
 metatypes_n4 <- gtools::permutations(2, 8, c(1:2), repeats = TRUE)
 metaseqs_n4 <- split(metatypes_n4, row(metatypes_n4))
 metaseqs_n4 <- lapply(metaseqs_n4, as.numeric)
@@ -99,7 +100,7 @@ IM_k1_n4[[2]] <- build_IMk(IM = "M",
                       s,
                       s_tot)
 
-# nearest neighbour
+# nearest neighbour (but only to one side)
 IM_k1_n4[[3]] <- list()
 IM_k1_n4[[3]][[1]] <- matrix(c(1,1,0,0,
                                0,1,1,0,
@@ -110,14 +111,14 @@ IM_k1_n4[[3]][[2]] <- matrix(c(1,1,0,0,
                                0,0,1,1,
                                1,0,0,1), 4, 4, byrow = TRUE)
 
-# preferential
+# preferential - on average k interactions per locus
 IM_k1_n4[[4]] <- build_IMk(IM = "P",
                       4,
                       1,
                       s,
                       s_tot)
 
-# hierarchical
+# hierarchical - on average k interactions per locus
 IM_k1_n4[[5]] <- build_IMk(IM = "H",
                       4,
                       1,
@@ -153,14 +154,14 @@ IM_k2_n4[[3]] <- build_IMk(IM = "N",
                       s,
                       s_tot)
 
-# preferential
+# preferential - on average k interactions per locus
 IM_k2_n4[[4]] <- build_IMk(IM = "P",
                       4,
                       2,
                       s,
                       s_tot)
 
-# hierarchical
+# hierarchical - on average k interactions per locus
 IM_k2_n4[[5]] <- build_IMk(IM = "H",
                       4,
                       2,
@@ -201,26 +202,21 @@ IM_c1_n2[[2]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
 IM_c1_n2[[2]][[2]] <- matrix(c(1, 0, 0 , 1), 2, 2)
 
 # asymmetric 
-# interaction with only one locus in the other species
-IM_c1_n2[[3]] <- list()
-IM_c1_n2[[3]][[1]] <- matrix(c(1, 1, 0 , 0), 2, 2)
-IM_c1_n2[[3]][[2]] <- matrix(c(0, 0, 1 , 1), 2, 2)
-
 # all loci involved in interaction
-IM_c1_n2[[4]] <- list()
-IM_c1_n2[[4]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
-IM_c1_n2[[4]][[2]] <- matrix(c(0, 1, 1 , 0), 2, 2)
+IM_c1_n2[[3]] <- list()
+IM_c1_n2[[3]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[3]][[2]] <- matrix(c(0, 1, 1 , 0), 2, 2)
 
 # all loci involved in interaction for one species; only one locus for the other
-IM_c1_n2[[5]] <- list()
-IM_c1_n2[[5]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
-IM_c1_n2[[5]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+IM_c1_n2[[4]] <- list()
+IM_c1_n2[[4]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[4]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
 ```
 
 
-# 1.2 running the simulations
+# 1.2) running the simulations
 ```{r simulations}
-
+set.seed(1313)
 peaks_nkcs_2121 <- assess_peaks(n, 
                          k = 1,
                          a, 
@@ -229,7 +225,7 @@ peaks_nkcs_2121 <- assess_peaks(n,
                          s_tot, 
                          IM_ks = IM_k1_n2,
                          IM_cs = IM_c2_n2,
-                         scape_reps = 250, 
+                         scape_reps = 200, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -248,7 +244,7 @@ peaks_nkcs_2021 <- assess_peaks(n,
                          s_tot, 
                          IM_ks = IM_k0_n2,
                          IM_cs = IM_c2_n2, 
-                         scape_reps = 250, 
+                         scape_reps = 200, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -324,7 +320,7 @@ peaks_nkcs_2001 <- assess_peaks(n,
                          s_tot, 
                          IM_ks = IM_k0_n2,
                          IM_cs = IM_c0_n2,
-                         scape_reps = 250, 
+                         scape_reps = 200, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -381,7 +377,7 @@ peaks_nkcs_4301 <- assess_peaks(n = 4,
                          s_tot, 
                          IM_ks = IM_k3_n4,
                          IM_cs = IM_c0_n4,
-                         scape_reps, 
+                         scape_reps = 250, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -406,10 +402,7 @@ peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak # I could 
 
 # save data
 save(peaks_total,
-      peaks_nkcs_4101,
-      peaks_nkcs_4201,
-      peaks_nkcs_4301,
-      peaks_nkcs_2121,
+     peaks_nkcs_2121,
       peaks_nkcs_2111,
       peaks_nkcs_2101,
       peaks_nkcs_2021,
@@ -418,8 +411,9 @@ save(peaks_total,
 
 ```
 
-## 1.2) summarising the results
+## 1.3) summarising the results
 ```{r}
+rm (list = ls())
 load("peaks_total")
 
 n = 2
@@ -520,6 +514,7 @@ ggplot(peaks_summarised2[peaks_summarised2$cycle_count > 0,],
      geom_boxplot() +
      theme_bw()
 
+# individual replicates reaching peak
 ggplot(peaks_summarised2,
         aes(y = prop_reached,
             x = interaction(peaked, n, k, c),
@@ -543,14 +538,11 @@ ggplot(peaks_total2,
   geom_jitter() +
   theme_bw()
 
-ggplot(peaks_total2,
-       aes(y = step,
-           x = interaction(peaked, n, k, c),
-           fill = walking)) +
-  geom_half_boxplot(nudge = 0.05, outlier.color = NA) +
-  geom_half_point() +
-  theme_bw()
+```
 
+
+# 2.1) plots for manuscript - main results
+```{r}
 # legends
 poster_theme <- theme(axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
@@ -568,8 +560,10 @@ poster_theme <- theme(axis.text.x.bottom = element_text(size=16),
   #          col = "#157F1F",
   #          vjust = - 1)
 
+
 big_plot_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$a == 2 &
+                                         peaks_total_ranked_summarised$c == 2 &
                                        peaks_total_ranked_summarised$walking == "greedy",],
         aes(y = prop_rank_peaked,
             x = rank,
@@ -582,52 +576,115 @@ big_plot_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
                   x = rank),
               col = "grey") +
   geom_jitter(aes(col = as.factor(c_rep)),
-              size = 1.5,
-              height = 0.01) +
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.4) +
   geom_jitter(aes(y = prop_cycle,
                   x = rank,
                   col = as.factor(c_rep)),
-              size = 1.5,
-              height = 0.01) +
-  stat_summary(fun.y = mean,
-               geom = "crossbar",
-               linewidth = 0.3,
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.4) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
                col = "grey30") +
-  stat_summary(aes(y = prop_cycle,
+  stat_summary(aes(y = prop_cycle, # adds the mean proportion of cycling/landscape
                   x = rank),
-               fun.y = mean,
+               fun = mean,
                geom = "crossbar",
-               linewidth = 0.3,
+               linewidth = 0.4,
                col = "grey30") +
      theme_bw() +
   facet_grid(c ~ k) +
   labs(col = "interaction matrix (C)") +
-  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "cycles"),
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "c"),
                      breaks = c(1:17),
                    name = "fitness rank",
                    sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
-  scale_y_continuous(name = "proportion of adaptive walks/landscape",
+  scale_y_continuous(name = "<span style='color:grey50'> proportion of overall outcomes </span>  \nproportion of adaptive walks/landscape",
                    sec.axis = sec_axis(~ . , name = "C", breaks = NULL, labels = NULL)) +
   theme(panel.grid.minor.x = element_blank(),
-        axis.title.y.right = element_text(angle = 0, vjust = 0.5)) +
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y.left = element_markdown()) +
   poster_theme
 
 ggsave(path = "../Figures/",
        device = "pdf",
        units = c("cm"),
-       width = 45,
-       height = 24,
-       filename = "big_plot_N2.pdf",
+       width = 35,
+       height = 20,
+       filename = "",
        plot = big_plot_N2)
 
+# looking at differences between the interaction matrices
+plot_N2_C1 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                       peaks_total_ranked_summarised$a == 2 &
+                                         peaks_total_ranked_summarised$c == 1 &
+                                       peaks_total_ranked_summarised$walking == "random",],
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = rank)) +
+  geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
+               group = 1),
+           fill = "grey85") + # across all my groupings
+     geom_violin(col = "grey") +
+  geom_violin(aes(y = prop_cycle,
+                  x = rank),
+              col = "grey") +
+  geom_jitter(aes(col = as.factor(c_rep)),
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.4) +
+  geom_jitter(aes(y = prop_cycle,
+                  x = rank,
+                  col = as.factor(c_rep)),
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.4) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "grey30") +
+  stat_summary(aes(y = prop_cycle, # adds the mean proportion of cycling/landscape
+                  x = rank),
+               fun = mean,
+               geom = "crossbar",
+               linewidth = 0.4,
+               col = "grey30") +
+     theme_bw() +
+  facet_grid(c_rep ~ k) +
+  labs(col = "interaction matrix (C)") +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "c"),
+                     breaks = c(1:17),
+                   name = "fitness rank",
+                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "<span style='color:grey50'> proportion of overall outcomes </span>  \nproportion of adaptive walks/landscape",
+                   sec.axis = sec_axis(~ . , name = "IM (C)", breaks = NULL, labels = NULL)) +
+  theme(panel.grid.minor.x = element_blank(),
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y.left = element_markdown()) +
+  poster_theme
+
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 35,
+       height = 35,
+       filename = "C1_reps_random.pdf",
+       plot = plot_N2_C1)
+
+# N = 4
 plot_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
                                        peaks_total_ranked_summarised$walking == "greedy",],
         aes(y = prop_rank_peaked,
             x = rank,
             group = interaction(rank, walking))) +
+  geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
+               group = 1),
+           fill = "grey85") + # across all my groupings
      geom_violin(col = "grey") +
-  geom_jitter(aes(col = as.factor(k_rep),
-                  shape = as.factor(species)),
+  geom_jitter(aes(col = as.factor(k_rep)),
               size = 1.5) +
   stat_summary(fun.y = median,
                geom = "crossbar",
@@ -639,23 +696,350 @@ plot_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n 
                    sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
   ylab("Proportion of adaptive walks/landscape") +
      theme_bw() +
-  facet_grid( ~ k) +
-  labs(shape = "species",
-       col = "interaction matrix (K)") +
+  facet_grid(k_rep ~ k) +
+  labs(col = "interaction matrix (K)") +
   theme(panel.grid.minor = element_blank()) +
   poster_theme
 
 ggsave(path = "../Figures/",
        device = "pdf",
        units = c("cm"),
-       width = 45,
-       height = 15,
-       filename = "plot_N4.pdf",
+       width = 35, # 45
+       height = 30, # 15
+       filename = "K_reps.pdf",
        plot = plot_N4)
+
 
 ```
 
-## 2.1) Plots I put on my GRS/GRC poster
+### 2.1.1) measuring ruggedness
+```{r}
+# give each landscape a unique ID
+
+peaks_total_ranked_summarised$landscape_ID <- interaction(peaks_total_ranked_summarised$n, peaks_total_ranked_summarised$k, peaks_total_ranked_summarised$c, peaks_total_ranked_summarised$k_rep, peaks_total_ranked_summarised$c_rep, peaks_total_ranked_summarised$scape_rep)
+
+greedy_only <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$walking == "greedy" & 
+                                               is.na(peaks_total_ranked_summarised$prop_cycle) &
+                                               peaks_total_ranked_summarised$n == 2 &
+                                               peaks_total_ranked_summarised$species == 1,]
+
+# how many outcomes are there on the same landscape?
+greedy_only_summed <- as.data.frame(greedy_only |> 
+                            dplyr::group_by(k, c, n, landscape_ID, ) |>
+                            dplyr::summarise(outcomes = n())) 
+
+# K = 1, C = 0
+mult_peak <- nrow(greedy_only_summed[greedy_only_summed$k == 1 & 
+                            greedy_only_summed$c == 0 &
+                            greedy_only_summed$outcomes > 1,]) # tot = 200
+
+# K = 1, C = 1
+mult_peak <- nrow(greedy_only_summed[greedy_only_summed$k == 1 & 
+                            greedy_only_summed$c == 1 &
+                            greedy_only_summed$outcomes > 1,]) # tot = 200
+
+# K = 0, C = 1
+mult_peak <- nrow(greedy_only_summed[greedy_only_summed$k == 0 & 
+                            greedy_only_summed$c == 1 &
+                            greedy_only_summed$outcomes > 1,]) # tot = 200
+
+
+
+# joint "community" peaks (peaks for both species together)
+
+## calculate roughness to slope ratio
+# fit a linear regression to gentoype - fitness 
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2001[[4]][[1]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_200_1_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(0, length(r)),
+                            c = rep(0, length(r)),
+                            c_rep = rep(1, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2101[[4]][[1]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_210_1_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(1, length(r)),
+                            c = rep(0, length(r)),
+                            c_rep = rep(1, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2011[[4]][[1]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_201_1_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(0, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(1, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2011[[4]][[2]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_201_2_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(0, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(2, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2011[[4]][[3]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_201_3_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(0, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(3, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2011[[4]][[4]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_201_4_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(0, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(4, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2011[[4]][[5]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_201_5_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(0, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(5, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2111[[4]][[1]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_211_1_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(1, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(1, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2111[[4]][[2]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_211_2_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(1, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(2, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2111[[4]][[3]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_211_3_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(1, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(3, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2111[[4]][[4]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+
+}
+
+ruggedness_nkc_rep_sp_211_4_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(1, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(4, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            rugg = r/s)
+
+r <- NULL
+s <- NULL
+s_k <- NULL
+s_c <- NULL
+
+for (i in 1:50) {
+  
+  temp_landscape <- peaks_nkcs_2111[[4]][[5]][[i]][[1]]
+  linear_model <- lm(temp_landscape$fitness ~ temp_landscape$F.1 + temp_landscape$F.2 + temp_landscape$P.1 + temp_landscape$P.2)
+  
+  r <- c(r, var(linear_model$residuals))
+  s <- c(s, mean(linear_model$coefficients[-1]))
+  
+  s_k <- c(s_k, sum(linear_model$coefficients[c(2,3)]))
+  s_c <- c(s_c, sum(linear_model$coefficients[c(4,5)]))
+  
+  
+
+}
+
+ruggedness_nkc_rep_sp_211_5_1 <- data.frame(n = rep(2, length(r)),
+                            k = rep(1, length(r)),
+                            c = rep(1, length(r)),
+                            c_rep = rep(5, length(r)),
+                            sp = rep(1, length(r)),
+                            r = r,
+                            s = s,
+                            c_vs_k = s_c/s_k,
+                            rugg = r/s)
+
+ruggedness_df <- rbind(ruggedness_nkc_rep_sp_200_1_1, ruggedness_nkc_rep_sp_201_1_1, ruggedness_nkc_rep_sp_201_2_1, ruggedness_nkc_rep_sp_201_3_1, ruggedness_nkc_rep_sp_201_4_1, ruggedness_nkc_rep_sp_201_5_1, ruggedness_nkc_rep_sp_210_1_1, ruggedness_nkc_rep_sp_211_1_1, ruggedness_nkc_rep_sp_211_2_1, ruggedness_nkc_rep_sp_211_3_1, ruggedness_nkc_rep_sp_211_4_1, ruggedness_nkc_rep_sp_211_5_1)
+
+ruggedness_df$rugg <- abs(ruggedness_df$rugg)
+ruggedness_df$rugg <- round(ruggedness_df$rugg, 4)
+
+ggplot(ruggedness_df,
+       aes(x = interaction(n, k, c),
+           y = rugg,
+           group = interaction(n, k, c, c_rep))) +
+  geom_boxplot(aes(col = as.factor(c_rep))) +
+  scale_y_log10() + 
+  ylab("log(roughness/slope)")+
+  theme_bw()
+
+```
+
+## 2.2) Plots I put on my GRS/GRC poster
 ``` {r Poster figures}
 
 legend <- scale_colour_manual(values = c("#157F1F", "#FCA311", "#CB48B7"),
@@ -767,7 +1151,7 @@ ggsave(path = "../Figures/",
        filename = "cycle_fig.pdf",
        plot = cycle_fig)
 
-example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[5]][[22]], # this is just a pair of landscapes I chose because they lead to cycling
+example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[2]][[40]], # this is just a pair of landscapes I chose because they lead to cycling
                  n,
                  c,
                  s,
@@ -782,7 +1166,7 @@ ggsave(path = "../Figures/",
        units = c("cm"),
        width = 35,
        height = 14,
-       filename = "example_scape_fig.pdf",
+       filename = "scapes_NKC_211_2_40.pdf",
        plot = example_scape_fig)
 
 walks_fig <- visualise_walks(peaks_nkcs_2111[[5]][[5]][[22]][[1]][[28]], # these are the adaptive walks (cycling) that go with the example I chose (greedy walk)
@@ -805,221 +1189,6 @@ ggsave(path = "../Figures/",
  
 ```
 
-
-## 2.2) exploring the adaptive walks
-trying to find differences between effect of C and K by looking at the rank of the endpoints
-```{r}
-
-peaks_total$norm_fit <- peaks_total$fitness/peaks_total$global_peak
-
-#peaks_total <- peaks_total[peaks_total$norm_fit < 1 & peaks_total$norm_fit > 0,]
-
-peaks_total_mod <- peaks_total[peaks_total$step < 100,]
-
-test_df <- data.frame(normfit_sp1 = peaks_total_mod[peaks_total_mod$species == 1, "norm_fit"],
-                      normfit_sp2 = peaks_total_mod[peaks_total_mod$species == 2, "norm_fit"],
-                      n = peaks_total_mod[peaks_total_mod$species == 1, "n"],
-                      k = peaks_total_mod[peaks_total_mod$species == 1, "k"],
-                      c = peaks_total_mod[peaks_total_mod$species == 1, "c"],
-                      walk_type = peaks_total_mod[peaks_total_mod$species == 1, "walking"])
-
-ggplot(test_df[test_df$walk_type == "greedy" & test_df$n == 2,],
-       aes(x = normfit_sp1,
-           y = normfit_sp2,
-           col = as.factor(c),
-            shape = as.factor(k))) +
-  geom_point(size = 3) +
-  xlim(c(-1,1)) +
-  ylim(c(-1,1)) +
-  theme_bw()
-
-
-sum_df <- as.data.frame(peaks_total[peaks_total$n == 2 & peaks_total$step < 100,] |> 
-                            group_by(k, c, n, a, k_rep, c_rep, scape_rep, species, walking) |>
-                          dplyr::summarise(mean_rank = mean(rank),
-                                           median_rank = median(rank),
-                                           sd_rank = sd(rank)))
-                          
-test_df2 <- data.frame(mean_rank_sp1 = sum_df[sum_df$species == 1, "mean_rank"],
-                       mean_rank_sp2 = sum_df[sum_df$species == 2, "mean_rank"],
-                       median_rank_sp1 = sum_df[sum_df$species == 1, "median_rank"],
-                       median_rank_sp2 = sum_df[sum_df$species == 2, "median_rank"],
-                       sd_rank_sp1 = sum_df[sum_df$species == 1, "sd_rank"],
-                       sd_rank_sp2 = sum_df[sum_df$species == 2, "sd_rank"],
-                       walking = sum_df[sum_df$species == 1, "walking"],
-                      n = sum_df[sum_df$species == 1, "n"],
-                      k = sum_df[sum_df$species == 1, "k"],
-                      c = sum_df[sum_df$species == 1, "c"])
-
-ggplot(test_df2,
-       aes(x = mean_rank_sp1,
-           y = mean_rank_sp2,
-           col = as.factor(c),
-            shape = as.factor(k))) +
-  geom_point(size = 3) +
-  geom_errorbar(aes(ymin = (mean_rank_sp2 - sd_rank_sp2),
-                    ymax = (mean_rank_sp2 + sd_rank_sp2)),
-                alpha = 0.3) +
-  geom_errorbar(aes(xmin = (mean_rank_sp1 - sd_rank_sp1),
-                    xmax = (mean_rank_sp1 + sd_rank_sp1)),
-                alpha = 0.3) +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-ggplot(test_df2,
-       aes(x = mean_rank_sp1,
-           y = mean_rank_sp2,
-           col = interaction(c,k),
-           group = interaction(c,k))) +
-  geom_point(size = 3,
-             alpha = 0.4) +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-summary(test_df2$mean_rank_sp1)
-
-ggplot(test_df2[test_df2$c == 1,],
-       aes(x = mean_rank_sp1,
-           y = mean_rank_sp2,
-           shape = as.factor(c),
-            col = as.factor(k))) +
-  geom_point(size = 3) +
-  geom_density_2d() +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-
-ggplot(test_df2,
-       aes(x = median_rank_sp1,
-           y = median_rank_sp2,
-           col = as.factor(c),
-            shape = as.factor(k))) +
-  geom_point(size = 3) +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-```
-
-doing some adaptive walks stuff
-```{r} 
-
-library(ggarrow)
-
-# walk example 
-cycle_walk <- peaks_nkcs_2111[[5]][[5]][[22]][[1]][[28]]
-
-cycle_df <- data.frame(rank_sp1 = cycle_walk[[1]][,"rank"],
-                         rank_sp2 = cycle_walk[[2]][,"rank"],
-                         step = cycle_walk[[1]][,"step"])
-
-ggplot(cycle_df,
-       aes(x = rank_sp1,
-           y = rank_sp2)) +
-  geom_point(size = 3,
-             aes(col = step)) +
-  geom_arrow_chain() +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-example_walk <- peaks_nkcs_2111[[5]][[4]][[22]][[1]][[7]]
-
-example_df <- data.frame(rank_sp1 = example_walk[[1]][,"rank"],
-                         rank_sp2 = example_walk[[2]][,"rank"],
-                         step = example_walk[[1]][,"step"])
-
-ggplot(example_df,
-       aes(x = rank_sp1,
-           y = rank_sp2)) +
-  geom_point(size = 3,
-             aes(col = step)) +
-  geom_arrow_chain() +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-ggplot(example_df,
-       aes(x = rank_sp1,
-           y = rank_sp2)) +
-  geom_point(size = 3,
-             aes(col = step)) +
-  geom_point(data = cycle_df,
-             size = 3,
-             aes(col = step)) +
-  geom_arrow_chain() +
-  geom_arrow_chain(data = cycle_df) +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-walks_dfs <- NULL
-for (i in 1:walk_reps){
-  
- temp_df <- peaks_nkcs_2111[[5]][[5]][[22]][[1]][[i]]
- temp_df <- data.frame(rank_sp1 = temp_df[[1]][,"rank"],
-                         rank_sp2 = temp_df[[2]][,"rank"],
-                         step = temp_df[[1]][,"step"],
-                       focal = temp_df[[1]][,"focal"],
-                       walk = i)
- 
- walks_dfs <- rbind(walks_dfs, temp_df)
-  
-}
-
-ggplot(walks_dfs[walks_dfs$walk == 1,],
-       aes(x = rank_sp1,
-           y = rank_sp2)) +
-  geom_point(size = 3) +
-  geom_arrow_chain(aes(group = walk,
-                       colour = focal)) +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-walks_dfs <- list()
-for (i in 1:walk_reps){
-  
- temp_df <- peaks_nkcs_2111[[5]][[5]][[22]][[1]][[i]]
- temp_df <- data.frame(rank_sp1 = temp_df[[1]][,"rank"],
-                         rank_sp2 = temp_df[[2]][,"rank"],
-                         step = temp_df[[1]][,"step"],
-                       focal = temp_df[[1]][,"focal"],
-                       walk = i)
- 
- walks_dfs[[i]] <- temp_df
-  
-}
-
-plot <- ggplot(walks_dfs[[1]],
-       aes(x = rank_sp1,
-           y = rank_sp2,
-           group = walk)) +
-  geom_point(size = 3,
-             aes(col = step)) +
-  geom_arrow_chain(aes(col = walk)) +
-  geom_point(data =  walks_dfs[[2]],
-                    size = 3,
-             aes(col = step)) +
-  geom_arrow_chain(data =  walks_dfs[[2]],
-                   aes(col = walk)) +
-  scale_x_continuous(breaks = c(1:16)) +
-  scale_y_continuous(breaks = c(1:16)) +
-  theme_bw()
-
-for (i in 2:walk_reps) {
-  
-  plot <- plot + geom_point(data =  walks_dfs[[i]],
-                    size = 3,
-             aes(col = step)) +
-  geom_arrow_chain(data =  walks_dfs[[i]])
-  
-}
-
-```
  
 ## 3) Trying some linear models
 ```{r}
@@ -1030,6 +1199,7 @@ test_data1 <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2
 
 test_data <- peaks_total[peaks_total$n == 2 &
                          peaks_total$a == 2 &
+                           peaks_total$c != 2 &
                            peaks_total$walking == "greedy" &
                            peaks_total$step < 100,]
 
@@ -1041,11 +1211,13 @@ test_data3$cycle <- "N"
 test_data3[test_data3$step == 100, "cycle"] <- "Y"
 
 library(nnet)
+library(broom)
 
+# the effect of C/K on the final rank
 model <- nnet::multinom(as.factor(rank) ~ as.factor(k) * as.factor(c), data = test_data)
 #sum_mod <- summary(model)
 
-coef_df <- tidy(model) %>%
+coef_df <- broom::tidy(model) %>%
   mutate(
     OR  = exp(estimate),                 # odds ratio
     OR_low  = exp(estimate - 1.96*std.error), # 95% CI lower
@@ -1070,16 +1242,14 @@ ggplot(coef_df,
   theme_bw(base_size = 14) +
   labs(y = "log(Odds ratio)", x = "") +
   scale_x_discrete(labels = c("as.factor(c)1" = "C = 1",
-                              "as.factor(c)2" = "C = 2",
                               "as.factor(k)1" = "K = 1",
-                              "as.factor(k)1:as.factor(c)1" = "C = 1:K = 1",
-                              "as.factor(k)1:as.factor(c)2" = "C = 2:K = 1")) 
+                              "as.factor(k)1:as.factor(c)1" = "C = 1:K = 1")) 
 
 model_cycle <- glm(as.factor(cycle) ~ as.factor(k) * as.factor(c) * as.factor(c_rep),
              data = test_data3,
              family = binomial(link = "logit"))
 
-coef_df <- tidy(model_cycle) %>%
+coef_df <- broom::tidy(model_cycle) %>%
   mutate(
     OR  = exp(estimate),                 # odds ratio
     OR_low  = exp(estimate - 1.96*std.error), # 95% CI lower
