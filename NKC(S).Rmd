@@ -409,13 +409,14 @@ fitness_calc_mult <- function(gene_vector){
 ```
 
 # 3.4) Generate intergenomic interaction matrices
+To automate the generation of the interaction matrices for intergenomic interactions
 ```{r IM_c}
 
-build_IMc <- function(IM = c("R", "M", "P", "H", "D"),
-                      n,
-                      c,
-                      s,
-                      s_tot){
+build_IMc <- function(IM = c("R", "M", "P", "H", "D"), # type of matrix
+                      n, # number of loci in each genome
+                      c, # number of loci interacting
+                      s, # number of species interacting
+                      s_tot){ # total number of species in the community
   
   # determine how to construct the intergenomic epistatic interactions and what kind of interaction matrix (IM) to use 
   if (IM == "R"){# for Random matrix
@@ -597,7 +598,7 @@ build_landscape <- function(IM_k, # intragenomic epistasis matrices
       
       # for each genotype we look up the fitness contribution (h) at each locus; h depends on k+1+c*s loci 
       # for each locus:
-      for (l in 1:n) { # skipping "k" to iterate over, since k is used as a variable in the model
+      for (l in 1:n) { # skipping the placeholer "k" to iterate over, since k is used as a variable in the model
         
         # which loci determine the fitness contribution at this locus?
         interesting_loci_k <- which(IM_k[[i]][l, ] != 0) # based on the intragenomic IM
@@ -612,7 +613,7 @@ build_landscape <- function(IM_k, # intragenomic epistasis matrices
         index <- 1
       
         # for all loci contributing to h:
-        for (m in 1:(k+1+(s*c))) {
+        for (m in 1:length(alleles)) {
         
         index <- index + (a^((k+1+(s*c))-m))*(alleles[m]-1)
         
@@ -922,12 +923,14 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     # stop if fitness for *all* species didn't change since last step
     stop_test <- NULL
     
+    # will take at least two steps to compare current fitness to two different time points in the past 
     if (step > 2){
     
     for (i in 1:s_tot){
       
+      # comparing fitness between now and last step as well as comparing fitness with now and two steps ago
       if (walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-1, 2*n+(s*n)+1] &
-          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-2, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself
+          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-2, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself; for now two steps back works because of s_tot = 2
         
         stop_test <- c(stop_test, 1)
         
@@ -944,7 +947,7 @@ adaptive_walk <- function(landscape, # landscape(s) on which to perform walk(s)
     
     if (length(stop_test) == s_tot) { break }
    
-    # stop after a number of steps if no optimum was reached (usually shouldn't be an issue)
+    # stop after a number of steps if no optimum was reached (usually only an issue if there is cycling)
     if (step > max_steps) { break } 
      
   }
@@ -986,11 +989,11 @@ visualise_system <- function(landscapes,
   geom_line(data = visual_scapes_df,
             aes(group = group,
                 linetype = mut),
-            color="grey80",
-            linewidth = 0.9) +
+            color="grey70",
+            linewidth = 1) +
   geom_label(label = visual_scapes_df$seq,
              aes(col = seq),
-             label.size = 0.6, # thickness of label border in mm
+             linewidth = 0.6, # thickness of label border in mm
              size = 4.5, # size of label in mm
              fontface = "bold" # bold font
              ) +
@@ -1006,7 +1009,7 @@ visualise_system <- function(landscapes,
   theme(legend.position = "none",
         panel.grid.major.y = element_blank(),
         panel.grid.minor.y = element_blank(),
-        panel.grid.major.x = element_line(linewidth = 0.5, linetype = 2),
+        panel.grid.major.x = element_line(linewidth = 0.8, linetype = 2),
         panel.grid.minor.x = element_blank(),
         text = element_text(size = 15),
         axis.text = element_text(size = 13))
@@ -1187,11 +1190,11 @@ for (k_rep in 1:IM_k_reps) {
   
 }
 
-return(list(peaks_df, 
-            IM_ks,
-            IM_cs,
-            scapes_replicated,
-            total_walks))
+return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
+            IM_ks, # interaction matrices of intragenomic interactions
+            IM_cs, # interaction matrices of intergenomic interactions
+            scapes_replicated, # all the fitness landscapes
+            total_walks)) # the individual adaptive walks
 
 }
 
