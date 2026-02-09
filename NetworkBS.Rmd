@@ -53,7 +53,7 @@ for (i in 1:16) {
 walks_dfs <- NULL
 for (i in 1:48){
   
- temp_df <- peaks_nkcs_2111[[5]][[2]][[40]][[1]][[i]]
+ temp_df <- peaks_nkcs_2111[[5]][[2]][[39]][[1]][[i]]
  
  IDs <- NULL
  
@@ -98,8 +98,8 @@ g <- igraph::graph_from_data_frame(walks_dfs_summed2,
 # add metadata to the nodes in the network (here "averaged per node")
 igraph::V(g)$count <- ave(walks_dfs_summed2$rep_count, walks_dfs_summed2$from, FUN = max)[match(V(g)$name, walks_dfs_summed2$from)]
 
-ranks_sp1 <- peaks_nkcs_2111[[4]][[2]][[40]][[1]]$rank
-test_df <- peaks_nkcs_2111[[4]][[2]][[40]][[2]]
+ranks_sp1 <- peaks_nkcs_2111[[4]][[2]][[39]][[1]]$rank
+test_df <- peaks_nkcs_2111[[4]][[2]][[39]][[2]]
 ranks_sp2 <- test_df[order(test_df$P.1, test_df$P.2, test_df$F.1, test_df$F.2), "rank"]
 
 igraph::V(g)$rank_sp1 <- ranks_sp1
@@ -163,13 +163,13 @@ graph <- ggraph::ggraph(g,
   guides(edge_linetype = guide_legend(position = "top"))
 
 
-ggsave(path = "../Figures/",
-       device = "pdf",
-       units = c("cm"),
-       width = 15,
-       height = 12,
-       filename = "graph_NKC_211_2_30.pdf",
-       plot = graph)
+# ggsave(path = "../Figures/",
+#        device = "pdf",
+#        units = c("cm"),
+#        width = 15,
+#        height = 12,
+#        filename = "graph_NKC_211_2_40.pdf",
+#        plot = graph)
 
 # ggraph::ggraph(adj_mat) +
 #   geom_edge_fan(arrow = arrow(type = "closed",
