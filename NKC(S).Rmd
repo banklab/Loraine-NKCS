@@ -1110,7 +1110,8 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
       
       # comparing fitness between now and last step as well as comparing fitness with now and two steps ago
       if (walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-1, 2*n+(s*n)+1] &
-          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-2, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself; for now two steps back works because of s_tot = 2
+          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-2, 2*n+(s*n)+1] &
+          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-3, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself; for now two steps back works because of s_tot = 2; if I introduce larger asymmetries with R this also needs to be updated...
         
         stop_test <- c(stop_test, 1)
         

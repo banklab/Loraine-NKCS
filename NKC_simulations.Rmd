@@ -1,0 +1,649 @@
+---
+title: "NKC_exploration"
+output: html_notebook
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
+```
+
+### Set up workspace
+```{r libraries}
+rm (list = ls())
+
+library(ggplot2) # for plotting
+library(gtools) # permutations to get all possible genotype combinations
+library(dplyr) # for constructing the data sets
+library(gghalves) # for plotting mixed boxplots with points
+library(ggtext) # to get different colour axis titles
+
+# load NKC functions
+source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from the code chunks in the markdown file
+
+```
+
+# 1) Let's let it rip!!
+## 1.1) defining parameters
+```{r parameters}
+set.seed(130) # for reproducibility
+
+n = 2 # number of loci in each genome
+a = 2 # number of alleles at each locus
+s = 1 # number of species interacting
+s_tot = 2 # total number of species in the community
+scape_reps = 50 # number of landscape replicates
+fitness_contrib = "N" # distribution from which we draw fitness contributions
+fitness_calculation = "KJ" # way to calculate genotype fitness 
+fit_mean = 0 # mean of distribution from which we draw fitness contribution
+fit_sd = 0.5 # sd of distribution from which we draw fitness contribution
+walk_reps = 80 # number of replicates for adaptive walks on a fitness landscape - starting at each metagenotype 5 times
+walk_type = c("greedy", "random", "prop") # types of adaptive walks implemented
+walk_start = "S" # where to start the adaptive walks (R - Random, WT - wildtype, S - specified)
+max_steps = 100 # max number of steps in the adaptive walk
+
+# defining the starting sequences for N = 2, so I can cycle through all possible starting points
+metatypes_n2 <- gtools::permutations(a, 2*n, c(1:a), repeats = TRUE) # all possible metagenotypes
+metaseqs_n2 <- split(metatypes_n2, row(metatypes_n2)) # break into list, where every metagenotype is an entry
+metaseqs_n2 <- lapply(metaseqs_n2, as.numeric) # converting into numbers
+
+# defining the starting sequences for N = 4, so I can cycle through all possible starting points
+metatypes_n4 <- gtools::permutations(a, 8, c(1:a), repeats = TRUE) # all possible metagenotypes
+metaseqs_n4 <- split(metatypes_n4, row(metatypes_n4)) # break into list, where every metagenotype is an entry
+metaseqs_n4 <- lapply(metaseqs_n4, as.numeric) # converting into numbers
+
+
+# defining all the interaction matrices outside the simulations for more reproducibility
+## K - intragenomic epistasis
+IM_k0_n2 <- list(build_IMk(IM = "R",
+                      2,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_k1_n2 <- list(build_IMk(IM = "R",
+                      2,
+                      1,
+                      s,
+                      s_tot)) # only one possible layout; all ones
+
+IM_k3_n4 <- list(build_IMk(IM = "R",
+                      4,
+                      3,
+                      s,
+                      s_tot)) # only one possible layout; all ones
+
+# replicates of interaction matrices
+## K = 1
+IM_k1_n4 <- list()
+
+# random
+IM_k1_n4[[1]] <- build_IMk(IM = "R",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+# modular
+IM_k1_n4[[2]] <- build_IMk(IM = "M",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+# nearest neighbour (but only to one side)
+IM_k1_n4[[3]] <- list()
+IM_k1_n4[[3]][[1]] <- matrix(c(1,1,0,0,
+                               0,1,1,0,
+                               0,0,1,1,
+                               1,0,0,1), 4, 4, byrow = TRUE)
+IM_k1_n4[[3]][[2]] <- matrix(c(1,1,0,0,
+                               0,1,1,0,
+                               0,0,1,1,
+                               1,0,0,1), 4, 4, byrow = TRUE)
+
+# preferential - on average k interactions per locus
+IM_k1_n4[[4]] <- build_IMk(IM = "P",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+# hierarchical - on average k interactions per locus
+IM_k1_n4[[5]] <- build_IMk(IM = "H",
+                      4,
+                      1,
+                      s,
+                      s_tot)
+
+
+## K = 2
+IM_k2_n4 <- list()
+
+# random
+IM_k2_n4[[1]] <- build_IMk(IM = "R",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+# modular
+IM_k2_n4[[2]] <- list()
+IM_k2_n4[[2]][[1]] <- matrix(c(1,1,1,0,
+                               1,1,1,0,
+                               1,1,1,0,
+                               0,1,1,1), 4, 4, byrow = TRUE)
+IM_k2_n4[[2]][[2]] <- matrix(c(1,1,1,0,
+                               1,1,1,0,
+                               1,1,1,0,
+                               0,1,1,1), 4, 4, byrow = TRUE)
+
+# nearest neighbour
+IM_k2_n4[[3]] <- build_IMk(IM = "N",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+# preferential - on average k interactions per locus
+IM_k2_n4[[4]] <- build_IMk(IM = "P",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+# hierarchical - on average k interactions per locus
+IM_k2_n4[[5]] <- build_IMk(IM = "H",
+                      4,
+                      2,
+                      s,
+                      s_tot)
+
+## C
+IM_c0_n2 <- list(build_IMc(IM = "R",
+                      2,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_c2_n2 <- list(build_IMc(IM = "R",
+                      2,
+                      2,
+                      s,
+                      s_tot)) # only one possible layout
+
+IM_c0_n4 <- list(build_IMc(IM = "R",
+                      4,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
+
+# C = 1
+IM_c1_n2 <- list()
+
+# symmetric
+# only one locus involved in intergenomic epistasis
+IM_c1_n2[[1]] <- list()
+IM_c1_n2[[1]][[1]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+IM_c1_n2[[1]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+
+# all loci involved in interaction
+IM_c1_n2[[2]] <- list()
+IM_c1_n2[[2]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[2]][[2]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+
+# asymmetric 
+# all loci involved in interaction
+IM_c1_n2[[3]] <- list()
+IM_c1_n2[[3]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[3]][[2]] <- matrix(c(0, 1, 1 , 0), 2, 2)
+
+# all loci involved in interaction for one species; only one locus for the other
+IM_c1_n2[[4]] <- list()
+IM_c1_n2[[4]][[1]] <- matrix(c(1, 0, 0 , 1), 2, 2)
+IM_c1_n2[[4]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
+```
+
+## 1.2) running the simulations
+```{r simulations}
+set.seed(130) # for reproducibility
+
+peaks_nkcs_2011 <- assess_peaks_R(n, 
+                         k = 0,
+                         a, 
+                         c = 1, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c1_n2, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2011_R <- assess_peaks_R(n, 
+                         k = 0,
+                         a, 
+                         c = 1, 
+                         s, 
+                         R = 2,
+                         s_tot, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c1_n2, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2121 <- assess_peaks_R(n, 
+                         k = 1,
+                         a, 
+                         c = 2, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c2_n2,
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2021 <- assess_peaks_R(n, 
+                         k = 0,
+                         a, 
+                         c = 2, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c2_n2, 
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2111 <- assess_peaks_R(n, 
+                         k = 1,
+                         a, 
+                         c = 1, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c1_n2, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2111_R <- assess_peaks_R(n, 
+                         k = 1,
+                         a, 
+                         c = 1, 
+                         s, 
+                         R = 2,
+                         s_tot, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c1_n2, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2101 <- assess_peaks_R(n, 
+                         k = 1,
+                         a, 
+                         c = 0, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c0_n2, 
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2001 <- assess_peaks_R(n, 
+                         k = 0,
+                         a, 
+                         c = 0, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c0_n2,
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2021_R <- assess_peaks_R(n, 
+                         k = 0,
+                         a, 
+                         c = 2, 
+                         s, 
+                         R = 2,
+                         s_tot, 
+                         IM_ks = IM_k0_n2,
+                         IM_cs = IM_c2_n2, 
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+peaks_nkcs_2121_R <- assess_peaks_R(n, 
+                         k = 1,
+                         a, 
+                         c = 2, 
+                         s, 
+                         R = 2,
+                         s_tot, 
+                         IM_ks = IM_k1_n2,
+                         IM_cs = IM_c2_n2, 
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = metaseqs_n2,
+                         max_steps)
+
+# N = 4
+peaks_nkcs_4101 <- assess_peaks_R(n = 4, 
+                         k = 1,
+                         a, 
+                         c = 0, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k1_n4,
+                         IM_cs = IM_c0_n4, 
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n4, 
+                         max_steps)
+
+peaks_nkcs_4201 <- assess_peaks_R(n = 4, 
+                         k = 2,
+                         a, 
+                         c = 0, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k2_n4,
+                         IM_cs = IM_c0_n4,
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n4,
+                         max_steps)
+
+peaks_nkcs_4301 <- assess_peaks_R(n = 4, 
+                         k = 3,
+                         a, 
+                         c = 0, 
+                         s, 
+                         R = 1,
+                         s_tot, 
+                         IM_ks = IM_k3_n4,
+                         IM_cs = IM_c0_n4,
+                         scape_reps = 250, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n4, 
+                         max_steps)
+
+peaks_total <- dplyr::bind_rows(peaks_nkcs_4101[[1]],
+                                peaks_nkcs_4201[[1]],
+                                peaks_nkcs_4301[[1]],
+                                peaks_nkcs_2121[[1]],
+                                peaks_nkcs_2111[[1]],
+                                peaks_nkcs_2101[[1]],
+                                peaks_nkcs_2021[[1]],
+                                peaks_nkcs_2011[[1]],
+                                peaks_nkcs_2001[[1]]) #the bind_rows function allows me to bind dfs with different column numbers; missing values are filled with NA; this is because I want to compare the effect of variable n 
+
+peaks_total_R <- dplyr::bind_rows(peaks_nkcs_2111_R[[1]],
+                                peaks_nkcs_2011_R[[1]],
+                                peaks_nkcs_2121_R[[1]],
+                                peaks_nkcs_2021_R[[1]])
+
+peaks_total$reached <- peaks_total$fitness == peaks_total$global_peak # I could also just check if rank == 1
+peaks_total_R$reached <- peaks_total_R$fitness == peaks_total_R$global_peak # I could also just check if rank == 1
+
+```
+
+## 1.3) summarising the results
+```{r}
+# group simulations by how many species reached their global peak (0/1/2)
+peaks_total2 <- as.data.frame(peaks_total |> 
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, step, walk_rep, walking) |>
+                            dplyr::summarise(peaked = sum(reached)))
+
+## count potential cycles
+peaks_total2[peaks_total2$step < max_steps, "pot_cycle"] <- 0 
+peaks_total2[peaks_total2$step == max_steps, "pot_cycle"] <- 1 # identify potential cycles
+
+## summarise the adaptive walk replicates
+peaks_summarised <- as.data.frame(peaks_total2 |> 
+                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, walking, peaked) |>
+                            dplyr::summarise(peak_count = n(),
+                                             cycle_count = sum(pot_cycle)) |>
+  tidyr::complete(peaked = 0:2, fill = list(peak_count = 0,
+                                            cycle_count = 0))) # add events that did not occur to the df with count 0 to get probabilities of events
+
+## calculate percentages 
+peaks_summarised$tot_reps <- walk_reps
+peaks_summarised$prop_reached <- peaks_summarised$peak_count/peaks_summarised$tot_reps
+peaks_summarised$prop_cycled <- peaks_summarised$cycle_count/peaks_summarised$tot_reps
+
+# summarise cycling behaviour instead
+peaks_summarised_cycles <- as.data.frame(peaks_summarised |> 
+                            dplyr::group_by(k, c, n, walking, k_rep, c_rep, peaked) |>
+                            dplyr::summarise(cycles_count = sum(cycle_count))) 
+
+peaks_summarised_cycles$prop_cycles <- peaks_summarised_cycles$cycles_count/(walk_reps*scape_reps)
+
+####### group simulations by fitness rank instead
+peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < max_steps,] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_cycle_summarised <- as.data.frame(peaks_total[peaks_total$step == max_steps,] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
+                            dplyr::summarise(cycle_count = n())) 
+peaks_total_cycle_summarised$rank <- 17 # I assign the cycles rank "17" for plotting reasons 
+
+peaks_total_ranked_summarised <- merge(peaks_total_ranked_summarised, 
+      peaks_total_cycle_summarised, 
+      all.x = TRUE, all.y = TRUE)
+
+## calculate percentages 
+peaks_total_ranked_summarised$tot_reps <- walk_reps
+peaks_total_ranked_summarised$prop_rank_peaked <- peaks_total_ranked_summarised$rank_peaked/peaks_total_ranked_summarised$tot_reps
+peaks_total_ranked_summarised$prop_cycle <- peaks_total_ranked_summarised$cycle_count/peaks_total_ranked_summarised$tot_reps
+
+# repeat for simulations with different mutation rounds
+peaks_total_ranked_summarised_R <- as.data.frame(peaks_total_R[peaks_total_R$step < max_steps,] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_cycle_summarised_R <- as.data.frame(peaks_total_R[peaks_total_R$step == max_steps,] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
+                            dplyr::summarise(cycle_count = n())) 
+#peaks_total_cycle_summarised_R$rank <- 17 # no cycles here
+
+peaks_total_ranked_summarised_R <- merge(peaks_total_ranked_summarised_R, 
+      peaks_total_cycle_summarised_R, 
+      all.x = TRUE, all.y = TRUE)
+
+## calculate percentages 
+peaks_total_ranked_summarised_R$tot_reps <- walk_reps
+peaks_total_ranked_summarised_R$prop_rank_peaked <- peaks_total_ranked_summarised_R$rank_peaked/peaks_total_ranked_summarised_R$tot_reps
+peaks_total_ranked_summarised_R$prop_cycle <- peaks_total_ranked_summarised_R$cycle_count/peaks_total_ranked_summarised_R$tot_reps
+
+
+
+####### above, all df have separate rows for the different species; here we combine both
+# combine both species into a single data frame and give each landscape a unique ID
+peaks_total_ranked2 <- as.data.frame(peaks_total[peaks_total$n == 2 &
+                                                   peaks_total$step < max_steps &
+                                                              peaks_total$walking == "prop",] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_ranked2_cyc <- as.data.frame(peaks_total[peaks_total$n == 2 &
+                                                   peaks_total$step == max_steps &
+                                                              peaks_total$walking == "prop",] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_ranked2_cyc$rank <- 17
+
+peaks_total_ranked2 <- bind_rows(peaks_total_ranked2, peaks_total_ranked2_cyc)
+
+peaks_total_ranked2_comb <- peaks_total_ranked2[peaks_total_ranked2$species == 1,]
+
+colnames(peaks_total_ranked2_comb)[9] <- "rank_sp1"
+peaks_total_ranked2_comb$rank_sp2 <- peaks_total_ranked2[peaks_total_ranked2$species == 2, "rank"]
+
+peaks_total_ranked2_summarised <- as.data.frame(peaks_total_ranked2_comb |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, rank_sp1, rank_sp2, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_ranked2_summarised$landscape_ID <- interaction(peaks_total_ranked2_summarised$n, peaks_total_ranked2_summarised$k, peaks_total_ranked2_summarised$c, peaks_total_ranked2_summarised$c_rep, peaks_total_ranked2_summarised$scape_rep)
+
+### same but with R = 2
+peaks_total_ranked2_R <- as.data.frame(peaks_total_R[peaks_total_R$n == 2 &
+                                                   peaks_total_R$step < max_steps &
+                                                              peaks_total_R$walking == "prop",] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_ranked2_cyc_R <- as.data.frame(peaks_total_R[peaks_total_R$n == 2 &
+                                                   peaks_total_R$step == max_steps &
+                                                              peaks_total_R$walking == "prop",] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+#peaks_total_ranked2_cyc_R$rank <- 17 # no cycles
+
+peaks_total_ranked2_R <- bind_rows(peaks_total_ranked2_R, peaks_total_ranked2_cyc_R)
+
+peaks_total_ranked2_comb_R <- peaks_total_ranked2_R[peaks_total_ranked2_R$species == 1,]
+
+colnames(peaks_total_ranked2_comb_R)[9] <- "rank_sp1"
+peaks_total_ranked2_comb_R$rank_sp2 <- peaks_total_ranked2_R[peaks_total_ranked2_R$species == 2, "rank"]
+
+peaks_total_ranked2_summarised_R <- as.data.frame(peaks_total_ranked2_comb_R |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, rank_sp1, rank_sp2, species) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
+peaks_total_ranked2_summarised_R$landscape_ID <- interaction(peaks_total_ranked2_summarised_R$n, peaks_total_ranked2_summarised_R$k, peaks_total_ranked2_summarised_R$c, peaks_total_ranked2_summarised_R$c_rep, peaks_total_ranked2_summarised_R$scape_rep)
+
+```
+
+## 1.4) Export 
+```{r}
+#save data
+save(peaks_total, # summary output of every single replicate walk on every replicate landscape
+     peaks_total_R, # summary output of every single replicate walk on every replicate landscape for R = 2
+     peaks_summarised, # this is for exploratory plotting; I grouped the results by how many species reach the global fitness peak
+     peaks_summarised_cycles, # this is for exploratory plotting; I grouped the results by how often cycling occurs
+     peaks_total_ranked_summarised, # endpoints grouped by how often they occur
+     peaks_total_ranked_summarised_R, # endpoints grouped by how often they occur for R = 2
+     peaks_total_ranked2_summarised, # endpoints grouped by how often they occur; both species combined and only for true adaptive walks
+     peaks_total_ranked2_summarised_R, # endpoints grouped by how often they occur; both species combined and only for true adaptive walks for R = 2
+     peaks_nkcs_2121, # raw simulation output
+      peaks_nkcs_2111,
+      peaks_nkcs_2101,
+      peaks_nkcs_2021,
+      peaks_nkcs_2011,
+      peaks_nkcs_2001,
+     peaks_nkcs_4101,
+     peaks_nkcs_4201,
+     peaks_nkcs_4301,
+     peaks_nkcs_2111_R,
+     peaks_nkcs_2011_R,
+     peaks_nkcs_2121_R,
+     peaks_nkcs_2021_R,
+     file = "peaks_total2")
+```
