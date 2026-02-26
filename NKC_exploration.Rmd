@@ -28,7 +28,7 @@ library(ggarrow) # to plot individual cycles
 source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # to get the landscape visualisation functions for example
 
 # load data of simulations
-load("peaks_total2") 
+load("peaks_total3") 
 
 ```
 
@@ -112,7 +112,7 @@ fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
 
 ```
 
-### Fig. 2 - fitness landscape example; R^2 version
+## Fig. 2 - fitness landscape example; R^2 version
 ```{r}
 # recoding fitness landscapes
 scape_sp1 <- peaks_nkcs_2111[[4]][[2]][[10]][[1]]
@@ -299,7 +299,7 @@ ggsave(path = "../Figures/",
 
 ```
 
-### Fig 3 - Repeatability N = 2
+## Fig 3 - Repeatability N = 2
 ```{r}
 localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
@@ -365,7 +365,7 @@ ggsave(path = "../Figures/",
 
 ```
 
-### Fig 4 - effect of interaction matrices on repeatability
+## Fig 4 - effect of interaction matrices on repeatability
 ```{r}
 
 effectIM_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
@@ -443,8 +443,7 @@ ggsave(path = "../Figures/",
 
 ```
 
-
-### Fig 5 - fitness distribution
+## Fig 5 - fitness distribution
 ```{r}
 fitness_dis_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
@@ -925,7 +924,7 @@ ggsave(path = "../Figures/",
 ```
 
 
-## 2.4) Trying out some stuff
+## Fig 7 - correlation-fitness relationship
 ```{r}
 
 combined_scapes_nkc_201 <- list()
@@ -1083,55 +1082,58 @@ for (i in 1:nrow(peaks_total_ranked2_summarised[, ])){
 
 }
 
-ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank),],
+
+eco_outcomes <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank),],
        aes(x = corr_rank,
            y = rank_sp1)) +
    geom_segment(aes(x = corr_rank, 
       y = rank_sp1, 
       xend = corr_rank, 
       yend = rank_sp2),
-      col = "grey",
-      alpha = 0.7) +
-  geom_point(col = "dodgerblue") +
+      col = "grey40",
+      alpha = 0.8) +
+  geom_point(col = "forestgreen",
+             size = 2,
+             aes(alpha = rank_peaked/80)) +
   geom_point(aes(x = corr_rank,
-                 y = rank_sp2),
-             col = "purple") +
+                 y = rank_sp2,
+                 alpha = rank_peaked/80),
+                 col = "forestgreen",
+             size = 2) +
   facet_grid(c ~ k) +
-  scale_y_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
-                     breaks = c(1:17),
-                   name = "fitness rank") +
-  xlab("correlation(rank F, rank P)") +
+  scale_y_continuous(labels = c("1", "3", "5", "7", "9", "11", "13", "15", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
+                     breaks = seq(1, 17, 2),
+                   name = "Fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = "C", breaks = NULL, labels = NULL)) +
+  scale_x_continuous(name = "rank correlation(F, P)",
+                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL),
+                   limits = c(-1,1)) +
   theme_bw() +
-  theme(panel.grid.minor.y = element_blank(),
+  theme(axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=24),
+                      legend.position = "none",
+                      strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0),
+                   panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
-  fig_theme
-
-test <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank),],
-       aes(x = corr_rank,
-           y = rank_sp1)) +
-   geom_segment(aes(x = corr_rank, 
-      y = rank_sp1, 
-      xend = corr_rank, 
-      yend = rank_sp2),
-      col = "grey",
-      alpha = 0.7) +
-  geom_point(col = "dodgerblue") +
-  geom_point(aes(x = corr_rank,
-                 y = rank_sp2),
-             col = "purple") +
-  facet_grid(c ~ k) +
-  scale_y_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
-                     breaks = c(1:17),
-                   name = "fitness rank") +
-  xlab("correlation(rank F, rank P)") +
-  theme_bw() +
-  theme(text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
-  fig_theme
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
 
 
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 30,
+       height = 17,
+       filename = "eco_outcomes.pdf",
+       plot = eco_outcomes)
 
+```
 
+## Fig 8 - correlation-fitness difference relationship
+```{r}
 
 ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17 &
                                         !is.na(peaks_total_ranked2_summarised$corr_rank),],
@@ -1142,26 +1144,28 @@ ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 !=
   scale_y_continuous(labels = c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
                      breaks = c(0:17),
                    name = "difference in fitness rank") +
-  xlab("correlation(rank F, rank P)") +
+  xlab("rank correlation(F, P)") +
   geom_smooth(method = "glm") +
   theme_bw() +
   theme(text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
   fig_theme
 
 
-ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17 &
-                                        !is.na(peaks_total_ranked2_summarised$corr_rank),],
+ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank),],
        aes(x = corr_rank,
-           y = rank_peaked/80)) +
-  geom_point(col = "forestgreen") +
+           y = (rank_sp1 + rank_sp2)/2)) +
+  geom_point(col = "dodgerblue") +
   facet_grid(c ~ k) +
-  scale_y_continuous(limits = c(0,1),
-                   name = "repeatability") +
-  xlab("correlation(rank F, rank P)") +
+  scale_y_continuous(labels = c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
+                     breaks = c(0:17),
+                   name = "mean community fitness rank") +
+  xlab("rank correlation(F, P)") +
   theme_bw() +
   theme(text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
   fig_theme
 ```
+
+
 
 ```{r}
 ## same but for R = 2
@@ -1948,8 +1952,7 @@ ggsave(path = "../Figures/",
        plot = ruggedness)
 ```
 
-
-### Greedy Repeatability N = 2
+## Greedy Repeatability N = 2
 ```{r}
 localrep_N2_greedy <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$walking == "greedy",], # only true walks in main text
@@ -2015,7 +2018,7 @@ ggsave(path = "../Figures/",
 
 ```
 
-### Random Repeatability N = 2
+## Random Repeatability N = 2
 ```{r}
 localrep_N2_random <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$walking == "random",], # only true walks in main text
@@ -2127,6 +2130,31 @@ ggsave(path = "../Figures/",
        plot = localrep_N2_R)
 ```
 
+## Repeatability predicted by interaction type (fitness correlation)?
+```{r}
+
+eco_rep <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17 &
+                                        !is.na(peaks_total_ranked2_summarised$corr_rank),],
+       aes(x = corr_rank,
+           y = rank_peaked/80)) +
+  geom_point(col = "forestgreen") +
+  facet_grid(c ~ k) +
+  xlim(c(-1,1)) +
+  scale_y_continuous(limits = c(0,1),
+                   name = "Proportion of adaptive walks/landscape") +
+  xlab("rank correlation(F, P)") +
+  theme_bw() +
+  theme(text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
+  fig_theme
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 26,
+       height = 15,
+       filename = "eco_rep_N2.pdf",
+       plot = eco_rep)
+```
 
 
 ## Visualising cycles
@@ -2162,8 +2190,6 @@ ggsave(path = "../Figures/",
        plot = cycle)
 
 ```
-
-
 
 # 4.) Analysis
 ## Assessing the number of outcomes
@@ -2217,6 +2243,7 @@ mult_peak2 <- nrow(prop_only_summed2_R[prop_only_summed2_R$k == 0 &
                             prop_only_summed2_R$outcomes > 1,]) # tot = 200
 
 ```
+
 
 # 5.) Additional figures
 ## Fitness landscape example; "classic" version
@@ -2377,8 +2404,52 @@ ggsave(path = "../Figures/",
 
 ```
 
+## Community fitness
+```{r}
+community_pattern <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$n == 2,], # only true walks in main text
+        aes(y = rank_peaked/80,
+            x = (rank_sp1 + rank_sp2)/2,
+            group = (rank_sp1 + rank_sp2)/2)) +
+  geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
+               group = 1),
+           fill = "thistle3") + # across all my groupings
+  geom_violin(col = "grey45") +
+  geom_jitter(col = "springgreen4",
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+     theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :)
+                     breaks = c(1:17),
+                   name = "Cpmmunity fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "<span style='color:thistle4'> Proportion of overall outcomes </span>  \nProportion of adaptive walks/landscape",
+                   sec.axis = sec_axis(~ . , name = "C", breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y.left = element_markdown(),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
+  fig_theme
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 26,
+       height = 17,
+       filename = "community_pattern.pdf",
+       plot = community_pattern)
 
 
+```
 
 # 6.) Plots I put on my GRS/GRC poster
 ``` {r Poster figures}

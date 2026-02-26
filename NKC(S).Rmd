@@ -1519,6 +1519,125 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 
 }
 
+## if I want to rerun simulations on already existing fitness landscapes:
+assess_peaks_R_input <- function(n, # nb. of loci
+                         k, # nb. of loci interacting within genome (intragenomic epistasis)
+                         a, # nb. of alleles at each locus
+                         c, # nb. of loci interacting between genomes (intergenomic epistasis)
+                         s, # nb. of species interacting
+                         R, # number of mutation rounds for sp 1
+                         s_tot, # total nb. of species in system
+                         IM_ks, # list of intragenomic epistasis interaction matrices
+                         IM_cs, # list of intergenomic epistasis interaction matrices
+                         landscapes, # give previously generated fitness landscapes as an input here
+                         scape_reps, # nb. of replicates to generate fitness landscapes for each combination of IM_k and IM_c
+                         walk_reps, # nb. of replicates of adaptive walks on a given landscape
+                         walk_type, # vector of types of adaptive walks (random, greedy, prop)
+                         walk_start, # starting genotype of adaptive walk (random, starting at reference type/WT, or starting at a specified sequence)
+                         start_seqs, # if I want to specify where the adaptive walk starts -> supplied as a list
+                         max_steps) # max nb. of steps in adaptive walk
+{
+
+# get number of replicates for intragenomic epistasis interaction matrix
+  IM_k_reps <- length(IM_ks)
+ 
+# get number of replicates for intergenomic epistasis interaction matrix
+  IM_c_reps <- length(IM_cs)
+
+# for each combination of IM_k and IM_c make the landscapes and perform the random walks
+total_walks <- list()
+scapes_replicated <- landscapes
+
+peaks_df <- NULL #I want to save the endpoints of all walks in one df
+total_walks[[IM_c_reps]] <- list()
+
+for (k_rep in 1:IM_k_reps) {
+  
+  for (c_rep in 1:IM_c_reps){
+  
+    # create the landscapes
+  for (scape_rep in 1:scape_reps) {
+    
+    # identify the global fitness peak for each landscape
+    global_peaks <- list()
+    
+    for (global_peak in 1:s_tot){
+      
+      global_peaks[[global_peak]] <-  max(scapes_replicated[[c_rep]][[scape_rep]][[global_peak]][,2*n+s*n+1])
+      
+    }
+    
+    # for each landscape perform the adaptive walks
+    total_walks[[c_rep]][[scape_rep]] <- list()
+    
+    for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
+
+    walks_replicated <- list()
+    
+    # perform the walk
+    for (walk_rep in 1:walk_reps) {
+      
+      if (walk_start == "S"){
+        
+        desired_start <- start_seqs[[walk_rep %% length(start_seqs) + 1]]
+          
+        }
+      
+      walks_replicated[[walk_rep]] <- adaptive_walk_R(scapes_replicated[[c_rep]][[scape_rep]], 
+              walk = walking,
+              n,
+              c,
+              s,
+              s_tot, 
+              IM_c,
+              R,
+              start = walk_start,
+              desired_start,
+              max_steps)
+      
+      # store the desired information (endpoint of walk and simulation parameters)
+      for (species in 1:s_tot) {
+        
+        start_seq <- paste(paste(walks_replicated[[walk_rep]][[species]][1, c(1:n)], collapse = ""), "-", c(paste(walks_replicated[[walk_rep]][[species]][1, c((n+1):(n+n*s))], collapse = ""))) # I want to save the starting point of each adaptive walk
+        
+        # and then keep track of the end points of each walk here; I am saving the end point of the walk alongside the simulation parameters
+        peaks_df <- rbind(peaks_df, cbind(walks_replicated[[walk_rep]][[species]][nrow(walks_replicated[[walk_rep]][[species]]),], data.frame(k_rep, 
+                                                                                                                                              c_rep, 
+                                                                                                                                              scape_rep, 
+                                                                                                                                              walk_rep, 
+                                                                                                                                              species,
+                                                                                                                                              n,
+                                                                                                                                              k,
+                                                                                                                                              a,
+                                                                                                                                              c,
+                                                                                                                                              s,
+                                                                                                                                              walk_start,
+                                                                                                                                              walking,
+                                                                                                                                              start_seq,
+                                                                                                                                              global_peak = global_peaks[[species]])))
+        
+      }
+      
+    }
+    
+    total_walks[[c_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
+    
+    }
+  
+  }
+    
+  }
+  
+}
+
+return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
+            IM_ks, # interaction matrices of intragenomic interactions
+            IM_cs, # interaction matrices of intergenomic interactions
+            scapes_replicated, # all the fitness landscapes
+            total_walks)) # the individual adaptive walks
+
+}
+
 
 ````
 

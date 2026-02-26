@@ -14,11 +14,8 @@ knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_sc
 ```{r libraries}
 rm (list = ls())
 
-library(ggplot2) # for plotting
 library(gtools) # permutations to get all possible genotype combinations
 library(dplyr) # for constructing the data sets
-library(gghalves) # for plotting mixed boxplots with points
-library(ggtext) # to get different colour axis titles
 
 # load NKC functions
 source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from the code chunks in the markdown file
@@ -230,7 +227,7 @@ peaks_nkcs_2011 <- assess_peaks_R(n,
                          start_seqs = metaseqs_n2,
                          max_steps)
 
-peaks_nkcs_2011_R <- assess_peaks_R(n, 
+peaks_nkcs_2011_R <- assess_peaks_R_input(n, 
                          k = 0,
                          a, 
                          c = 1, 
@@ -239,11 +236,8 @@ peaks_nkcs_2011_R <- assess_peaks_R(n,
                          s_tot, 
                          IM_ks = IM_k0_n2,
                          IM_cs = IM_c1_n2, 
+                         peaks_nkcs_2011[[4]], # running the adaptive walks with asymmetry on the same landscapes as above
                          scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
@@ -310,7 +304,7 @@ peaks_nkcs_2111 <- assess_peaks_R(n,
                          start_seqs = metaseqs_n2,
                          max_steps)
 
-peaks_nkcs_2111_R <- assess_peaks_R(n, 
+peaks_nkcs_2111_R <- assess_peaks_R_input(n, 
                          k = 1,
                          a, 
                          c = 1, 
@@ -318,12 +312,9 @@ peaks_nkcs_2111_R <- assess_peaks_R(n,
                          R = 2,
                          s_tot, 
                          IM_ks = IM_k1_n2,
-                         IM_cs = IM_c1_n2, 
+                         IM_cs = IM_c1_n2,
+                         peaks_nkcs_2111[[4]],
                          scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
@@ -370,7 +361,8 @@ peaks_nkcs_2001 <- assess_peaks_R(n,
                          start_seqs = metaseqs_n2,
                          max_steps)
 
-peaks_nkcs_2021_R <- assess_peaks_R(n, 
+
+peaks_nkcs_2021_R <- assess_peaks_R_input(n, 
                          k = 0,
                          a, 
                          c = 2, 
@@ -378,19 +370,16 @@ peaks_nkcs_2021_R <- assess_peaks_R(n,
                          R = 2,
                          s_tot, 
                          IM_ks = IM_k0_n2,
-                         IM_cs = IM_c2_n2, 
+                         IM_cs = IM_c2_n2,
+                         peaks_nkcs_2021[[4]],
                          scape_reps = 200, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = metaseqs_n2,
                          max_steps)
 
-peaks_nkcs_2121_R <- assess_peaks_R(n, 
+peaks_nkcs_2121_R <- assess_peaks_R_input(n, 
                          k = 1,
                          a, 
                          c = 2, 
@@ -399,11 +388,8 @@ peaks_nkcs_2121_R <- assess_peaks_R(n,
                          s_tot, 
                          IM_ks = IM_k1_n2,
                          IM_cs = IM_c2_n2, 
+                         peaks_nkcs_2121[[4]],
                          scape_reps = 200, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
@@ -645,5 +631,5 @@ save(peaks_total, # summary output of every single replicate walk on every repli
      peaks_nkcs_2011_R,
      peaks_nkcs_2121_R,
      peaks_nkcs_2021_R,
-     file = "peaks_total2")
+     file = "peaks_total3")
 ```
