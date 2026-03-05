@@ -1,7 +1,7 @@
 # Loraine-NKCS
 Loraine's code of the NKCS model in R - 24.02.2026
 
-The code is based on the explanation of the NK model in Welch & Waxman (2005) + I used some code collected at https://www.cs.unibo.it/~fioretti/CODE/NK/ to help me
+The code is based on the explanation of the NK model in Welch & Waxman (2005) + I used some code collected at https://www.cs.unibo.it/~fioretti/CODE/NK/ to help me implement the NKC model
 
 The NKCS model was originally introduced my Kauffman & Johnsen (1991)
 
