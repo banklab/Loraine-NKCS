@@ -25,7 +25,7 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 # 1) Let's let it rip!!
 ## 1.1) defining parameters
 ```{r parameters}
-set.seed(131313) # for reproducibility
+set.seed(2512) # for reproducibility
 
 n = 2 # number of loci in each genome
 a = 2 # number of alleles at each locus
@@ -39,7 +39,7 @@ fit_sd = 0.5 # sd of distribution from which we draw fitness contribution
 walk_reps = 80 # number of replicates for adaptive walks on a fitness landscape - starting at each metagenotype 5 times
 walk_type = c("greedy", "random", "prop") # types of adaptive walks implemented
 walk_start = "S" # where to start the adaptive walks (R - Random, WT - wildtype, S - specified)
-max_steps = 200 # max number of steps in the adaptive walk
+max_steps = 250 # max number of steps in the adaptive walk
 
 # defining the starting sequences for N = 2, so I can cycle through all possible starting points
 metatypes_n2 <- gtools::permutations(a, 2*n, c(1:a), repeats = TRUE) # all possible metagenotypes
@@ -205,7 +205,7 @@ IM_c1_n2[[4]][[2]] <- matrix(c(1, 1, 0 , 0), 2, 2)
 
 ## 1.2) running the simulations
 ```{r simulations}
-set.seed(131313) # for reproducibility
+set.seed(2512) # for reproducibility
 
 peaks_nkcs_2011 <- assess_peaks_R(n, 
                          k = 0,
@@ -553,13 +553,13 @@ peaks_total_ranked_summarised_R$prop_cycle <- peaks_total_ranked_summarised_R$cy
 # combine both species into a single data frame and give each landscape a unique ID
 peaks_total_ranked2 <- as.data.frame(peaks_total[peaks_total$n == 2 &
                                                    peaks_total$step < max_steps &
-                                                              peaks_total$walking == "prop",] |> 
+                                                              peaks_total$walking == "random",] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_ranked2_cyc <- as.data.frame(peaks_total[peaks_total$n == 2 &
                                                    peaks_total$step == max_steps &
-                                                              peaks_total$walking == "prop",] |> 
+                                                              peaks_total$walking == "random",] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
@@ -581,13 +581,13 @@ peaks_total_ranked2_summarised$landscape_ID <- interaction(peaks_total_ranked2_s
 ### same but with R = 2
 peaks_total_ranked2_R <- as.data.frame(peaks_total_R[peaks_total_R$n == 2 &
                                                    peaks_total_R$step < max_steps &
-                                                              peaks_total_R$walking == "prop",] |> 
+                                                              peaks_total_R$walking == "random",] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_ranked2_cyc_R <- as.data.frame(peaks_total_R[peaks_total_R$n == 2 &
                                                    peaks_total_R$step == max_steps &
-                                                              peaks_total_R$walking == "prop",] |> 
+                                                              peaks_total_R$walking == "random",] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
@@ -632,5 +632,10 @@ save(peaks_total, # summary output of every single replicate walk on every repli
      peaks_nkcs_2011_R,
      peaks_nkcs_2121_R,
      peaks_nkcs_2021_R,
-     file = "peaks_total5")
+     file = "peaks_total7")
 ```
+
+
+
+
+

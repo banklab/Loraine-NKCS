@@ -16,21 +16,24 @@ rm (list = ls())
 
 library(ggplot2) # for plotting
 library(dplyr) # for constructing the data sets
-library(gghalves) # for plotting mixed boxplots with points
+library(gghalves) # for plotting mixed boxplots with points; I only used this for the graphs I put on my poster
 library(ggtext) # to get different colour axis titles
 
 library(ggraph) # for plotting networks -> adaptive walks representation
 library(igraph) # for plotting networks -> adaptive walks representation
 
 library(ggarrow) # to plot individual cycles
-
 library(ggpubr) # to arrange multiple figures
+library(egg) # to make plot insets
+
+library(glmmTMB) # for mixed effect models
+library(effects) # to calculate estimates of mixed effect models
 
 # load NKC functions
 source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # to get the landscape visualisation functions for example
 
 # load data of simulations
-load("peaks_total5") 
+load("peaks_total7") 
 
 ```
 
@@ -78,7 +81,7 @@ ggplot(peaks_summarised,
      theme_bw()
 
 # how many steps in the adaptive walks?
-ggplot(peaks_total[peaks_total$reached == TRUE,],
+ggplot(peaks_total[peaks_total$reached == TRUE,], # for those that reached the global peak
        aes(y = step,
            x = interaction(n, k, c),
            col = walking,
@@ -86,11 +89,10 @@ ggplot(peaks_total[peaks_total$reached == TRUE,],
   geom_jitter() +
   theme_bw()
 
-ggplot(peaks_total,
+ggplot(peaks_total[peaks_total$species == 1,], # only plotting one species to make it less clustered
        aes(y = step,
            x = interaction(n, k, c),
-           col = walking,
-           shape = as.factor(species))) +
+           col = walking)) +
   geom_jitter() +
   theme_bw()
 
@@ -115,13 +117,13 @@ fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
 
 ```
 
-## Fig. 2 - fitness landscape example; R^2 version
+## Fig. 3 - fitness landscape example; R^2 version
 This figure shows us the two-dimensional fitness mapping for all the metagenotype -> each metagenotype can correspond to a different fitness rank for the two species
 ```{r}
 # recoding fitness landscapes; 
 ## in my model the alleles are encoded as 1 and 2, but I would different alleles for the two species to better distinguish them (differences in metagenotypes should be easier to spot this way)
 
-scape_sp1 <- peaks_nkcs_2111[[4]][[2]][[10]][[1]] # take desired landscape replicate for species 1 = "focal species"
+scape_sp1 <- peaks_nkcs_2111[[4]][[2]][[13]][[1]] # take desired landscape replicate for species 1 = "focal species"
 
 # recode alleles for focal species 
 scape_sp1[scape_sp1$F.1 == 1, "F.1"] <- "a" 
@@ -139,7 +141,7 @@ scape_sp1[scape_sp1$P.2 == 2, "P.2"] <- "B"
 colnames(scape_sp1)[c(7,8)] <- c("fitness_sp1", "rank_sp1")
 
 # take the corresponding fitness landscape of species 2 in the chosen species pair
-scape_sp2 <- peaks_nkcs_2111[[4]][[2]][[10]][[2]]
+scape_sp2 <- peaks_nkcs_2111[[4]][[2]][[13]][[2]]
 scape_sp2 <- scape_sp2[with(scape_sp2, order(P.1, P.2, F.1, F.2)), ] # reordering the loci, so they are in the same order as for sp 1
 
 # combine landscaps of sp1 and sp2
@@ -198,7 +200,7 @@ ggsave(path = "../Figures/",
        units = c("cm"),
        width = 19,
        height = 17,
-       filename = "lanscape_Rsqrd_NKC_211_2_30.pdf",
+       filename = "lanscape_Rsqrd_NKC_211_2_13.pdf",
        plot = lanscape_Rsqrd)
 
 ## versions of this figure I used in a presentation showing how to go from one-dimensional fitness mapping to two-dimensional fitness mapping
@@ -311,11 +313,11 @@ ggsave(path = "../Figures/",
 
 ```
 
-## Fig 3 - Repeatability N = 2
+## Fig 4a - Repeatability N = 2
 This is the first results figure that shows how many adaptive walks lead to the same outcome on each of our fitness lanscape replicates
 ```{r}
 localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
-                                       peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -323,6 +325,19 @@ localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
   geom_violin(aes(y = prop_cycle,
                   x = rank),
               col = "grey45") +
+  geom_rect(data = peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                                      peaks_total_ranked_summarised$c == 0 &
+                                                  peaks_total_ranked_summarised$scape_rep == 1 &
+                                                   peaks_total_ranked_summarised$rank == 1 &
+                                                   peaks_total_ranked_summarised$species == 1 &
+                                       peaks_total_ranked_summarised$walking == "random",], # this was the only way I was able to plot a single rectangle per facet :-(
+            aes(xmin = 4.5, 
+                xmax = 16.5, 
+                ymin = 0, 
+                ymax = 1), 
+            fill = "grey80", # putting a grey rectangle over the ranks that do not exist; for C = 0, there are only four possible fitness ranks per species
+            alpha = 0.5,
+            inherit.aes = FALSE) +
   geom_jitter(col = "springgreen4",
               size = 2.5,
               height = 0.01,
@@ -365,8 +380,7 @@ localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
   scale_y_continuous(name = "Proportion of adaptive walks/landscape",
                    sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
                                        breaks = NULL, labels = NULL)) +
-  theme(axis.title.y.right = element_text(angle = 0, vjust = 0.5),
-        axis.title.y.left = element_markdown(),
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
         text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
   fig_theme
 
@@ -380,16 +394,89 @@ ggsave(path = "../Figures/",
 
 ```
 
-## Fig 4 - effect of interaction matrices on repeatability
+## Fig 4c Repeatability N' = 4
+```{r}
+localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
+                                       peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = rank)) +
+     theme_bw() +
+  geom_violin(col = "grey45") +
+  geom_jitter(col = "forestgreen",
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  facet_grid( ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :-)
+                     breaks = c(1:17),
+                   name = "Fitness rank at the end of adaptive walk",
+                   limits = c(0.5,17.5),
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic("K'"))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of adaptive walks/landscape") +
+  theme(axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y = element_text(size=16),
+        axis.title.y.left = element_markdown(),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
+  fig_theme
+
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 37,
+       height = 10,
+       filename = "localrep_N4.pdf",
+       plot = localrep_N4)
+```
+
+
+## Fig 5 - effect of interaction matrices on repeatability
 Here we show how patterns of repeatability for C = 1 differ between the different interaction networks used to couple the two species
 ```{r}
 
 effectIM_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                          peaks_total_ranked_summarised$c == 1 &
-                                       peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
+  geom_rect(data = peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                                   peaks_total_ranked_summarised$c == 1 &
+                                                      peaks_total_ranked_summarised$c_rep == 1 &
+                                                  peaks_total_ranked_summarised$scape_rep == 1 &
+                                                   peaks_total_ranked_summarised$species == 1 &
+                                       peaks_total_ranked_summarised$walking == "random", ][c(1,2),], # this was the only way I was able to plot a single rectangle per facet :-(
+            aes(xmin = 8.5, 
+                xmax = 16.5, 
+                ymin = 0, 
+                ymax = 1), 
+            fill = "grey80", # putting a grey rectangle over the ranks that do not exist; for IM = 1, there are only eight possible fitness ranks per species
+            alpha = 0.5,
+            inherit.aes = FALSE) +
+  geom_rect(data = peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                                   peaks_total_ranked_summarised$c == 1 &
+                                                      peaks_total_ranked_summarised$c_rep == 4 &
+                                                  peaks_total_ranked_summarised$scape_rep == 1 &
+                                                   peaks_total_ranked_summarised$species == 1 &
+                                       peaks_total_ranked_summarised$walking == "random", ][c(1,2),], # this was the only way I was able to plot a single rectangle per facet :-(
+            aes(xmin = 8.5, 
+                xmax = 16.5, 
+                ymin = 0, 
+                ymax = 1), 
+            fill = "grey80", # putting a grey rectangle over the ranks that do not exist; for IM = 1, there are only eight possible fitness ranks per species
+            alpha = 0.2,
+            inherit.aes = FALSE) +
   geom_violin(col = "grey45") +
   geom_violin(aes(y = prop_cycle,
                   x = rank),
@@ -431,16 +518,16 @@ effectIM_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
   scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :-)
                      breaks = c(1:17),
                    name = "Fitness rank at the end of adaptive walk",
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic("K"))), 
                                        breaks = NULL, labels = NULL)) +
   scale_y_continuous(name = "Proportion of adaptive walks/landscape",
                      limits = c(0,1)) +
-  scale_color_manual(values=c("forestgreen", "limegreen", "olivedrab2", "gold")) + # different colours for the four ineraction networks
+  scale_color_manual(values=c("forestgreen", "limegreen", "olivedrab2", "gold")) + # different colours for the four interaction networks
   theme(panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.x = element_blank(),
         axis.title.y.right = element_text(angle = 0, vjust = 0.5),
-        axis.title.y.left = element_markdown(),
+        axis.title.y.left = ggtext::element_markdown(),
         axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
                         axis.title = element_text(size=24),
@@ -460,45 +547,520 @@ ggsave(path = "../Figures/",
 
 ```
 
-## Fig 5 - fitness distribution
-Here we show which fitness outcomes are the most common, which gives us the expected fitness distribution for each combination of K and C; this figure also shows the cycling probability
+## cycle investigation
 ```{r}
-fitness_dis_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
-                                       peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
-        aes(y = prop_rank_peaked,
+# for N = 2, K = 0, C = 1
+cycles_nkc_201 <- NULL
+
+c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
+                     peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "c_rep"]
+
+for (i in unique(c_rep)){ # IM replicates
+  
+  scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
+                              peaks_total$c_rep == i &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "scape_rep"]
+  
+  for (j in unique(scape_reps)) { # fitness landscape replicates
+    
+    walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
+                              peaks_total$c_rep == i &
+                               peaks_total$scape_rep == j &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "walk_rep"]
+    
+    for (l in unique(walk_reps)) {
+      
+      ranks_sp1 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      
+      summary_temp <- data.frame(n = 2,
+                              k = 0,
+                              c = 1,
+                              c_rep = i,
+                              scape_rep = j,
+                              walk_rep = l,
+                              nb_in_cycle_sp1 = length(ranks_sp1), # should be 4?
+                              nb_in_cycle_sp2 = length(ranks_sp2), # should be 4?
+                              high_rank_sp1 = min(ranks_sp1),
+                              high_rank_sp2 = min(ranks_sp2),
+                              low_rank_sp1 = max(ranks_sp1),
+                              low_rank_sp2 = max(ranks_sp2),
+                              var_rank_sp1 = var(ranks_sp1),
+                              var_rank_sp2 = var(ranks_sp2),
+                              mean_rank_sp1 = mean(ranks_sp1),
+                              mean_rank_sp2 = mean(ranks_sp2),
+                           landscape_ID = interaction(2, 0, 1, i, j))
+      
+      cycles_nkc_201 <- rbind(cycles_nkc_201, summary_temp)
+      
+    }
+    
+  }
+  
+}
+
+# for N = 2, K = 1, C = 1
+cycles_nkc_211 <- NULL
+
+c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 1 & 
+                     peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "c_rep"]
+
+for (i in unique(c_rep)){ # IM replicates
+  
+  scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 1 & 
+                              peaks_total$c_rep == i &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "scape_rep"]
+  
+  for (j in unique(scape_reps)) { # fitness landscape replicates
+    
+    walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 1 & 
+                              peaks_total$c_rep == i &
+                               peaks_total$scape_rep == j &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "walk_rep"]
+    
+    for (l in unique(walk_reps)) {
+      
+      ranks_sp1 <- unique(peaks_nkcs_2111[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2111[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      
+      summary_temp <- data.frame(n = 2,
+                              k = 1,
+                              c = 1,
+                              c_rep = i,
+                              scape_rep = j,
+                              walk_rep = l,
+                              nb_in_cycle_sp1 = length(ranks_sp1), # should be 4?
+                              nb_in_cycle_sp2 = length(ranks_sp2), # should be 4?
+                              high_rank_sp1 = min(ranks_sp1),
+                              high_rank_sp2 = min(ranks_sp2),
+                              low_rank_sp1 = max(ranks_sp1),
+                              low_rank_sp2 = max(ranks_sp2),
+                              var_rank_sp1 = var(ranks_sp1),
+                              var_rank_sp2 = var(ranks_sp2),
+                              mean_rank_sp1 = mean(ranks_sp1),
+                              mean_rank_sp2 = mean(ranks_sp2),
+                           landscape_ID = interaction(2, 1, 1, i, j))
+      
+      cycles_nkc_211 <- rbind(cycles_nkc_211, summary_temp)
+      
+    }
+    
+  }
+  
+}
+
+# for N = 2, K = 0, C = 2
+cycles_nkc_202 <- NULL
+
+c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 2 & 
+                     peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "c_rep"]
+
+for (i in unique(c_rep)){ # IM replicates
+  
+  scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 2 & 
+                              peaks_total$c_rep == i &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "scape_rep"]
+  
+  for (j in unique(scape_reps)) { # fitness landscape replicates
+    
+    walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 2 & 
+                              peaks_total$c_rep == i &
+                               peaks_total$scape_rep == j &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "walk_rep"]
+    
+    for (l in unique(walk_reps)) {
+      
+      ranks_sp1 <- unique(peaks_nkcs_2021[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2021[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      
+      summary_temp <- data.frame(n = 2,
+                              k = 0,
+                              c = 2,
+                              c_rep = i,
+                              scape_rep = j,
+                              walk_rep = l,
+                              nb_in_cycle_sp1 = length(ranks_sp1), 
+                              nb_in_cycle_sp2 = length(ranks_sp2), 
+                              high_rank_sp1 = min(ranks_sp1),
+                              high_rank_sp2 = min(ranks_sp2),
+                              low_rank_sp1 = max(ranks_sp1),
+                              low_rank_sp2 = max(ranks_sp2),
+                              var_rank_sp1 = var(ranks_sp1),
+                              var_rank_sp2 = var(ranks_sp2),
+                              mean_rank_sp1 = mean(ranks_sp1),
+                              mean_rank_sp2 = mean(ranks_sp2),
+                           landscape_ID = interaction(2, 0, 2, i, j))
+      
+      cycles_nkc_202 <- rbind(cycles_nkc_202, summary_temp)
+      
+    }
+    
+  }
+  
+}
+
+# for N = 2, K = 1, C = 2
+cycles_nkc_212 <- NULL
+
+c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 2 & 
+                     peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "c_rep"]
+
+for (i in unique(c_rep)){ # IM replicates
+  
+  scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 2 & 
+                              peaks_total$c_rep == i &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "scape_rep"]
+  
+  for (j in unique(scape_reps)) { # fitness landscape replicates
+    
+    walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 2 & 
+                              peaks_total$c_rep == i &
+                               peaks_total$scape_rep == j &
+                           peaks_total$step == 250 & 
+                       peaks_total$walking == "random" &
+                       peaks_total$species == 1, "walk_rep"]
+    
+    for (l in unique(walk_reps)) {
+      
+      ranks_sp1 <- unique(peaks_nkcs_2121[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2121[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      
+      summary_temp <- data.frame(n = 2,
+                              k = 1,
+                              c = 2,
+                              c_rep = i,
+                              scape_rep = j,
+                              walk_rep = l,
+                              nb_in_cycle_sp1 = length(ranks_sp1), 
+                              nb_in_cycle_sp2 = length(ranks_sp2), 
+                              high_rank_sp1 = min(ranks_sp1),
+                              high_rank_sp2 = min(ranks_sp2),
+                              low_rank_sp1 = max(ranks_sp1),
+                              low_rank_sp2 = max(ranks_sp2),
+                              var_rank_sp1 = var(ranks_sp1),
+                              var_rank_sp2 = var(ranks_sp2),
+                              mean_rank_sp1 = mean(ranks_sp1),
+                              mean_rank_sp2 = mean(ranks_sp2),
+                           landscape_ID = interaction(2, 1, 2, i, j))
+      
+      cycles_nkc_212 <- rbind(cycles_nkc_212, summary_temp)
+      
+    }
+    
+  }
+  
+}
+
+cycles_df <- rbind(cycles_nkc_201, cycles_nkc_211, cycles_nkc_212, cycles_nkc_202)
+cycles_df$cycle_ID <- interaction(cycles_df[, c("high_rank_sp1", "high_rank_sp2", "low_rank_sp1", "low_rank_sp2")])
+
+# for if I want to look at unique cycles (it is possible to have multiple cycles)
+summary_cycles <-  NULL
+
+for (scape_ID in unique(cycles_df$landscape_ID)){
+  
+  for (cycle_ID in unique(cycles_df[cycles_df$landscape_ID == scape_ID, "cycle_ID"])) {
+    
+    temp_df <- cycles_df[cycles_df$landscape_ID == scape_ID &
+                                              cycles_df$cycle_ID == cycle_ID, ]
+    
+    summary_temp <- data.frame(n = 2,
+                              k = unique(temp_df$k),
+                              c = unique(temp_df$c),
+                              c_rep = unique(temp_df$c_rep),
+                              scape_ID = scape_ID,
+                              cycle_ID = cycle_ID,
+                              nb_in_cycle_sp1 = mean(temp_df$nb_in_cycle_sp1),
+                              nb_in_cycle_sp2 = mean(temp_df$nb_in_cycle_sp2), 
+                              high_rank_sp1 = unique(temp_df$high_rank_sp1),
+                              high_rank_sp2 = unique(temp_df$high_rank_sp2),
+                              low_rank_sp1 = unique(temp_df$low_rank_sp1),
+                              low_rank_sp2 = unique(temp_df$low_rank_sp2),
+                              var_rank_sp1 = mean(temp_df$var_rank_sp1),
+                              var_rank_sp2 = mean(temp_df$var_rank_sp2),
+                              mean_rank_sp1 = mean(temp_df$mean_rank_sp1),
+                              mean_rank_sp2 = mean(temp_df$mean_rank_sp2),
+                              appeared = nrow(temp_df))
+    
+    summary_cycles <- rbind(summary_cycles, summary_temp)
+    
+  }
+  
+}
+
+```
+
+## Fig. 6 - fitness cost/interaction matrices C = 1
+```{r}
+df_cycles_sp1 <- data.frame(k = summary_cycles$k,
+                              c = summary_cycles$c,
+                              n = summary_cycles$n,
+                              a = rep(2, nrow(summary_cycles)),
+                              k_rep = rep(1, nrow(summary_cycles)),
+                              c_rep = summary_cycles$c_rep,
+                            scape_rep = rep(NA, nrow(summary_cycles)),
+                            walking = rep("random", nrow(summary_cycles)),
+                            rank = round(summary_cycles$mean_rank_sp1, 0),
+                            species = rep(1, nrow(summary_cycles)),
+                            rank_peaked = summary_cycles$appeared,
+                            cycle_count = rep(NA, nrow(summary_cycles)),
+                            tot_reps = rep(80, nrow(summary_cycles)),
+                            prop_rank_peaked = summary_cycles$appeared/80,
+                            prop_cycle = rep(NA, nrow(summary_cycles)),
+                            cycle = rep("yes", nrow(summary_cycles)))
+
+df_cycles_sp2 <- data.frame(k = summary_cycles$k,
+                              c = summary_cycles$c,
+                              n = summary_cycles$n,
+                              a = rep(2, nrow(summary_cycles)),
+                              k_rep = rep(1, nrow(summary_cycles)),
+                              c_rep = summary_cycles$c_rep,
+                            scape_rep = rep(NA, nrow(summary_cycles)),
+                            walking = rep("random", nrow(summary_cycles)),
+                            rank = round(summary_cycles$mean_rank_sp2, 0),
+                            species = rep(2, nrow(summary_cycles)),
+                            rank_peaked = summary_cycles$appeared,
+                            cycle_count = rep(NA, nrow(summary_cycles)),
+                            tot_reps = rep(80, nrow(summary_cycles)),
+                            prop_rank_peaked = summary_cycles$appeared/80,
+                            prop_cycle = rep(NA, nrow(summary_cycles)),
+                            cycle = rep("yes", nrow(summary_cycles)))
+
+
+peaks_total_ranked_w_cycles <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$rank != 17,]
+peaks_total_ranked_w_cycles$cycle <- "no"
+peaks_total_ranked_w_cycles <- rbind(peaks_total_ranked_w_cycles, df_cycles_sp1, df_cycles_sp2)
+
+prop_peaks_cycle <- peaks_total_ranked_w_cycles %>%
+  group_by(n, k, c, rank, walking, species, c_rep) %>%
+  summarise(count = sum(rank_peaked)) %>%
+  group_by(n, k, c, walking, c_rep, species) %>%
+  mutate(tot = sum(count)) %>%
+  mutate(prop = count/tot)
+
+IM_fitness_species <- ggplot(prop_peaks_cycle[prop_peaks_cycle$n == 2 &
+                                         prop_peaks_cycle$c == 1 &
+                                           prop_peaks_cycle$species == 1 &
+                                       prop_peaks_cycle$walking == "random",], # only random walks in main text
+        aes(y = prop,
             x = rank,
             group = rank)) +
-  geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
-               group = 1),
-           fill = "thistle3") + # across all my groupings
+  geom_rect(data = prop_peaks_cycle[prop_peaks_cycle$n == 2 &
+                                                      prop_peaks_cycle$c == 1 &
+                                      prop_peaks_cycle$rank == 1 &
+                                                   prop_peaks_cycle$species == 1 &
+                                                   prop_peaks_cycle$c_rep == 1 &
+                                       prop_peaks_cycle$walking == "random",][c(1,2),],
+            aes(xmin = 8.5, 
+                xmax = Inf, 
+                ymin = 0, 
+                ymax = 1), 
+            fill = "grey80",  # putting a grey rectangle over the ranks that do not exist; for IM = 1, there are only eight possible fitness ranks per species
+            alpha = 0.5) +
+  geom_rect(data = prop_peaks_cycle[prop_peaks_cycle$n == 2 &
+                                                      prop_peaks_cycle$c == 1 &
+                                      prop_peaks_cycle$rank == 1 &
+                                                   prop_peaks_cycle$species == 1 &
+                                                   prop_peaks_cycle$c_rep == 4 &
+                                       prop_peaks_cycle$walking == "random",][c(1,2),],
+            aes(xmin = 8.5, 
+                xmax = Inf, 
+                ymin = 0, 
+                ymax = 1), 
+            fill = "grey80",  # putting a grey rectangle over the ranks that do not exist; for IM = 1, there are only eight possible fitness ranks per species
+            alpha = 0.2) +
+  geom_col(aes(group = species,
+               fill = as.factor(species),
+               x = rank-0.2),
+           width = 0.4) + 
+  geom_col(data = prop_peaks_cycle[prop_peaks_cycle$n == 2 &
+                                     prop_peaks_cycle$c == 1 &
+                            prop_peaks_cycle$species == 2 &
+                          prop_peaks_cycle$walking == "random",],
+           aes(group = species,
+               fill = as.factor(species),
+               x = rank+0.2),
+           width = 0.4) +
      theme_bw() +
-  facet_grid(c ~ k) +
-  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :)
-                     breaks = c(1:17),
-                   name = "Fitness rank at the end of adaptive walk",
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
-                                       breaks = NULL, labels = NULL)) +
+  facet_grid(c_rep ~ k) +
+  scale_x_continuous(labels = c("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), 
+                     breaks = c(1:16),
+                     limits = c(0.5,16.5),
+                   name = "Fitness load (rank difference to global peak)",
+                   sec.axis = sec_axis(~ . , name = "intragenomic epistasis, K", breaks = NULL, labels = NULL)) +
   scale_y_continuous(name = "Proportion of overall outcomes",
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
-                                       breaks = NULL, labels = NULL)) +
+                     limits = c(0,1)) +
+  scale_fill_manual(values=c("palevioletred4","lavenderblush3"),
+                    breaks = c("1", "2"),
+                    labels = c("Focal species", "Partner species")) +
   theme(panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
         panel.grid.major.x = element_blank(),
         axis.title.y.right = element_text(angle = 0, vjust = 0.5),
         axis.title.y.left = element_markdown(),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
-  fig_theme
+        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=24),
+        strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0),
+        legend.text = element_text(size = 13),
+        legend.position = c(0.9,0.93),
+        legend.background = element_rect(fill = "transparent"),
+        legend.title = element_blank(),
+        text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
 
 ggsave(path = "../Figures/",
        device = cairo_pdf, # to save pdf with unicode
        units = c("cm"),
-       width = 26, # 30
-       height = 17, # 15
-       filename = "fitness_dis_N2.pdf",
-       plot = fitness_dis_N2)
+       width = 26,
+       height = 21,
+       filename = "effectIM_fit_N2_sp.pdf",
+       plot = IM_fitness_species)
 
 ```
 
-## Fig 6 - correlation-fitness relationship
+## fitness load - cycles vs. equilibrium + species vs community
+```{r}
+peaks_total_ranked_w_cycles$community <- "no"
+
+
+prop_peaks <- peaks_total_ranked_w_cycles %>%
+  group_by(n, k, c, cycle, rank, walking, community) %>%
+  summarise(count = sum(rank_peaked)) %>%
+  group_by(n, k, c, walking, community) %>%
+  mutate(tot = sum(count)) %>%
+  mutate(prop = count/tot)
+
+# community
+df_cycles_community <- data.frame(k = summary_cycles$k,
+                              c = summary_cycles$c,
+                              n = summary_cycles$n,
+                              a = rep(2, nrow(summary_cycles)),
+                              k_rep = rep(1, nrow(summary_cycles)),
+                              c_rep = summary_cycles$c_rep,
+                            scape_rep = rep(NA, nrow(summary_cycles)),
+                            rank_sp1 = round(summary_cycles$mean_rank_sp1, 0),
+                            rank_sp2 = round(summary_cycles$mean_rank_sp2, 0),
+                            community = rep("yes", nrow(summary_cycles)),
+                            rank_peaked = summary_cycles$appeared,
+                            landscape_ID = summary_cycles$scape_ID,
+                            corr_rank = rep(NA, nrow(summary_cycles)),
+                            cycle = rep("yes", nrow(summary_cycles)))
+
+community_ranked_w_cycles <- peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17, !names(peaks_total_ranked2_summarised) %in% c("species")]
+community_ranked_w_cycles$cycle <- "no"
+community_ranked_w_cycles$community <- "yes"
+community_ranked_w_cycles <- rbind(community_ranked_w_cycles, df_cycles_community)
+
+prop_community_cycle <- community_ranked_w_cycles %>%
+  group_by(n, k, c, rank_sp1, rank_sp2, community, cycle) %>%
+  summarise(count = sum(rank_peaked)) %>%
+  group_by(n, k, c, community) %>%
+  mutate(tot = sum(count)) %>%
+  mutate(prop = count/tot)
+
+fitness_species <- ggplot(prop_peaks[prop_peaks$n == 2 &
+                                       prop_peaks$c != 0 &
+                            prop_peaks$cycle == "no" &
+                          prop_peaks$walking == "random",],
+       aes(x = rank,
+           y = prop,
+           group = rank)) +
+  geom_col(data = prop_community_cycle[prop_community_cycle$n == 2 &
+                                         prop_community_cycle$cycle == "no" &
+                                         prop_community_cycle$c != 0,],
+           aes(x = (rank_sp1 + rank_sp2)/2-0.125,
+               group = (rank_sp1 + rank_sp2)/2,
+               y = -prop,
+               fill = interaction(community, cycle)),
+           width = 0.25) +
+  geom_col(data = prop_community_cycle[prop_community_cycle$n == 2 &
+                                         prop_community_cycle$cycle == "yes",],
+           aes(x = (rank_sp1 + rank_sp2)/2+0.125,
+               group = (rank_sp1 + rank_sp2)/2,
+               y = -prop,
+               fill = interaction(community, cycle)),
+           width = 0.25) +
+  geom_col(aes(group = cycle,
+               fill = interaction(community, cycle),
+               x = rank-0.125),
+           width = 0.25) + 
+  geom_col(data = prop_peaks[prop_peaks$n == 2 &
+                            prop_peaks$cycle == "yes" &
+                          prop_peaks$walking == "random",],
+           aes(group = cycle,
+               fill = interaction(community, cycle),
+               x = rank+0.125),
+           width = 0.25) + 
+  geom_hline(yintercept=0,
+             linewidth = 0.65,
+             col = "grey50") +
+     theme_bw() +
+  facet_grid(c ~ k) +
+  scale_fill_manual(values=c("forestgreen", "skyblue", "darkseagreen", "steelblue"),
+                    breaks = c("no.no", "no.yes", "yes.no", "yes.yes"),
+                    labels = c("Equilibrium", "Cycle", "Equilibrium", "Cycle")) +
+  scale_x_continuous(labels = c("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), 
+                     breaks = c(1:16),
+                     limits = c(0.5,16.5),
+                   name = "Fitness load (rank difference to global peak)",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of overall outcomes",
+                     limits = c(-0.3, 0.32),
+                     breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3),
+                     labels = c("0.3", "0.2", "0.1", "0.0", "0.1", "0.2", "0.3"),
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        axis.title.y.left = element_markdown(),
+        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=24),
+        strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0),
+        legend.text = element_text(size = 13),
+        legend.position = c(0.86,0.87),
+        legend.background = element_rect(fill = "transparent"),
+        legend.title = element_blank(),
+        text = element_text(family = "Arial Unicode MS")) 
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode character
+       units = c("cm"),
+       width = 26,
+       height = 15,
+       filename = "fitnessload.pdf",
+       plot = fitness_species)
+
+```
+
+
+## Fig 7 - correlation-fitness relationship
 Next, we show how the correlation of fitness ranks between the species can reveal some trends on how lare the expected fitnes cost of a species is
 ```{r}
 
@@ -656,13 +1218,26 @@ summary_cors <- rbind(summary_cors_nkc_201, summary_cors_nkc_202, summary_cors_n
 # and I want to link the correlations I just calculated to my results; so I add it so my dataframe, where the adaptive outcomes of both species are combined 
 
 # I'm sure this could be done with an apply function, but alas I am using a for loop
-for (i in 1:nrow(peaks_total_ranked2_summarised[, ])){
+for (i in 1:nrow(peaks_total_ranked2_summarised)){
   
   ID <- peaks_total_ranked2_summarised[i, "landscape_ID" ]
   
   if (ID %in% summary_cors$landscape_ID){
     
-    peaks_total_ranked2_summarised[i, "corr_rank" ] <- summary_cors[as.character(summary_cors$landscape_ID) == as.character(ID), "corr"]
+    peaks_total_ranked2_summarised[i, "corr_rank" ] <- unique(summary_cors[as.character(summary_cors$landscape_ID) == as.character(ID), "corr"])
+    
+  }
+
+}
+
+
+for (i in 1:nrow(community_ranked_w_cycles)){
+  
+  ID <- community_ranked_w_cycles[i, "landscape_ID" ]
+  
+  if (ID %in% summary_cors$landscape_ID){
+    
+    community_ranked_w_cycles[i, "corr_rank" ] <- unique(summary_cors[as.character(summary_cors$landscape_ID) == as.character(ID), "corr"])
     
   }
 
@@ -675,50 +1250,80 @@ for (i in 1:nrow(peaks_total_ranked2_summarised[, ])){
 # first plot
 eco_outcome <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank) &
                                                        peaks_total_ranked2_summarised$k == 0 &
-                                                       peaks_total_ranked2_summarised$c == 1,],
+                                                       peaks_total_ranked2_summarised$c == 1 &
+                                                       peaks_total_ranked2_summarised$rank_sp1 != 17,],
        aes(x = corr_rank,
            y = rank_sp1)) +
    geom_segment(aes(x = corr_rank, 
       y = rank_sp1, 
       xend = corr_rank, 
-      yend = rank_sp2),
-      col = "grey40",
-      alpha = 0.8) +
-  geom_point(col = "forestgreen",
-             size = 2,
-             aes(alpha = rank_peaked/80)) +
+      yend = rank_sp2,
+      alpha = rank_peaked/80),
+      col = "grey40") +
+  geom_segment(data = summary_cycles[summary_cycles$k == 0 & 
+                                   summary_cycles$c == 1,],
+               aes(x = corr_rank, 
+      y = mean_rank_sp1, 
+      xend = corr_rank, 
+      yend = mean_rank_sp2,
+      alpha = appeared/80),
+      col = "grey40") +
+  geom_point(size = 2.5,
+             aes(alpha = rank_peaked/80,
+                 col = "Equilibrium")) +
   geom_point(aes(x = corr_rank,
                  y = rank_sp2,
-                 alpha = rank_peaked/80),
-                 col = "forestgreen",
-             size = 2) +
-  scale_y_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
-                     breaks = c(1:17),
-                   name = "Fitness rank at the end of adaptive walk") +
+                 alpha = rank_peaked/80,
+                 col = "Equilibrium"),
+             size = 2.5) +
+  geom_point(data = summary_cycles[summary_cycles$k == 0 & 
+                                   summary_cycles$c == 1,],
+             aes(x = corr_rank,
+                 y = mean_rank_sp1,
+                 alpha = appeared/80,
+                 col = "Cycle"),
+             size = 2.5) +
+  geom_point(data = summary_cycles[summary_cycles$k == 0 & 
+                                   summary_cycles$c == 1,],
+             aes(x = corr_rank,
+                 y = mean_rank_sp2,
+                 alpha = appeared/80,
+                 col = "Cycle"),
+             size = 2.5) +
+  scale_colour_manual(values=c("forestgreen", "skyblue"),
+                      breaks = c("Equilibrium", "Cycle"),
+                      name = "") +
+  guides(alpha = "none") +
+  scale_y_continuous(labels = c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), 
+                     breaks = c(1:16),
+                     limits = c(1,16),
+                   name = "Species fitness load") +
   scale_x_continuous(name = "rank correlation(F, P)",
                    limits = c(-1,1)) +
   theme_bw() +
   theme(axis.text.x.bottom = element_text(size=16),
                         axis.text.y = element_text(size=15),
                         axis.title = element_text(size=24),
-                      legend.position = "none",
+                      legend.position = c(0.08,0.95),
                       strip.text.x = element_text(size = 15),
                       strip.text.y = element_text(size = 15, angle = 0),
                    panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
         axis.title.y.right = element_text(angle = 0, vjust = 0.5),
-        text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
+        legend.text = element_text(size=15),
+        legend.background = element_rect(fill = "transparent"))
+
 
 # second plot
-blank <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank) &
-                                                       peaks_total_ranked2_summarised$k == 0 &
-                                                       peaks_total_ranked2_summarised$c == 1,],
+blank <- ggplot(community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
+                                                       community_ranked_w_cycles$c == 1,],
        aes(x = corr_rank,
            y = rank_sp1)) +
-  scale_y_continuous(labels = c("1", "3", "5", "7", "9", "11", "13", "15", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
-                     breaks = seq(1, 17, 2),
-                   name = "Fitness rank at end of adaptive walk") +
+  scale_y_continuous(labels = c("0", "3", "6", "9", "12", "15"), 
+                     breaks = seq(1, 16, 3),
+                     limits = c(1,16),
+                   name = "") +
   scale_x_continuous(name = "  ",
                    limits = c(-1,1)) +
   theme_bw() +
@@ -732,19 +1337,56 @@ blank <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summar
                    panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
-        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
-        text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
+        plot.background = element_blank()) 
+
+# combine 1 and 2
+panel_a <- eco_outcome + 
+  annotation_custom(ggplotGrob(blank),
+                                xmin = 0.4,
+                                xmax = 1,
+                                ymin = 10,
+                                ymax = 16.5)
 
 
 # third plot
-distance_plot <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17 &
-                                                         peaks_total_ranked2_summarised$k == 0 &
-                                                       peaks_total_ranked2_summarised$c == 1 &
-                                        !is.na(peaks_total_ranked2_summarised$corr_rank),],
+model_diff <- glmmTMB::glmmTMB(abs(rank_sp1-rank_sp2) ~ corr_rank + (1 | landscape_ID) ,
+               data = community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
+                                                       community_ranked_w_cycles$c == 1,],
+               family = poisson,
+               weights = rank_peaked)
+
+model_diff_all <- glmmTMB::glmmTMB(abs(rank_sp1-rank_sp2) ~ corr_rank + c + k + c*k + (1 | landscape_ID) ,
+               data = community_ranked_w_cycles,
+               family = poisson,
+               weights = rank_peaked)
+
+effects_k0 <- effects::effect(term= "corr_rank", 
+                              mod= model_diff_all,
+                              xlevels = 50)
+effects_k0_df <- as.data.frame(effects_k0)
+
+
+distance_plot <- ggplot(community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
+                                                       community_ranked_w_cycles$c == 1,],
        aes(x = corr_rank,
            y = abs(rank_sp1-rank_sp2))) +
-  geom_point(col = "dodgerblue") +
-  geom_smooth(method = "glm") +
+  geom_ribbon(data = effects_k0_df, 
+              aes(x = corr_rank, 
+                  ymin = lower, 
+                  ymax = upper), 
+              inherit.aes = FALSE,
+              alpha= 0.3, 
+              fill="grey60") +
+  geom_point(aes(alpha = rank_peaked/80,
+                 col = cycle),
+             size = 2.5) +
+  geom_line(data = effects_k0_df, 
+            aes(x = corr_rank, 
+                y = fit),
+            linewidth = 1) +
+  scale_colour_manual(values=c("forestgreen", "skyblue"),
+                    breaks = c("no", "yes"),
+                    labels = c("Equilibrium", "Cycle")) +
   scale_y_continuous(labels = c("0", "2", "4", "6", "8", "10", "12", "14"),
                      breaks = seq(0,14,2),
                      limits = c(0,15),
@@ -762,456 +1404,85 @@ distance_plot <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summa
                    panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
-        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
-        text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5)) 
+
+# fourth plot
+model_mean <- glmmTMB::glmmTMB((rank_sp1+rank_sp2)/2 ~ corr_rank + (1 | landscape_ID) ,
+               data = community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
+                                                       community_ranked_w_cycles$c == 1,],
+               family = poisson,
+               weights = rank_peaked)
+
+effects_k0_mean <- effects::effect(term= "corr_rank", 
+                              mod= model_mean,
+                              xlevels = 50)
+effects_k0_mean_df <- as.data.frame(effects_k0_mean)
+
+mean_plot <- ggplot(community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
+                                                       community_ranked_w_cycles$c == 1,],
+       aes(x = corr_rank,
+           y = (rank_sp1+rank_sp2)/2)) +
+  geom_ribbon(data = effects_k0_mean_df, 
+              aes(x = corr_rank, 
+                  ymin = lower, 
+                  ymax = upper), 
+              inherit.aes = FALSE,
+              alpha= 0.3, 
+              fill="grey60") +
+  geom_point(aes(alpha = rank_peaked/80,
+                 col = cycle),
+             size = 2.5) +
+  geom_line(data = effects_k0_mean_df, 
+            aes(x = corr_rank, 
+                y = fit),
+            linewidth = 1) +
+  scale_colour_manual(values=c("forestgreen", "skyblue"),
+                    breaks = c("no", "yes"),
+                    labels = c("Equilibrium", "Cycle")) +
+  scale_y_continuous(labels = c("0", "2", "4", "6", "8", "10", "12", "14"),
+                     breaks = seq(1,15,2),
+                     limits = c(1,16),
+                   name = "Community fitness load") +
+  scale_x_continuous(name = "rank correlation(F, P)",
+                   limits = c(-1,1)) +
+  theme_bw() +
+  theme(axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=24),
+        axis.title.y = element_text(size=17),
+                      legend.position = "none",
+                      strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0),
+                   panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5)) 
 
 # combined plots
-fig_test <- ggpubr::ggarrange(eco_outcome, 
-                  ggpubr::ggarrange(blank, distance_plot, nrow = 2),
-                  ncol = 2,
-                     widths = c(1.35, 1))
+fig_test <- ggpubr::ggarrange(panel_a, NULL, # to have some extra space :-)
+                  ggpubr::ggarrange(distance_plot, mean_plot, ncol = 2),
+                  nrow = 3,
+                     heights = c(1.7, 0.1, 1))
 
 ggsave(path = "../Figures/",
        device = cairo_pdf, # to save pdf with unicode
        units = c("cm"),
        width = 30,
-       height = 17,
+       height = 25,
        filename = "eco_fig.pdf",
        plot = fig_test)
 
 ```
 
-## Fig 7 - cycle investigation
+
+## Community patterns
 ```{r}
 
-# for N = 2, K = 0, C = 1
-cycles_nkc_201 <- NULL
-
-c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
-                     peaks_total$step == 200 & 
-                       peaks_total$walking == "greedy" &
-                       peaks_total$species == 1, "c_rep"]
-
-for (i in unique(c_rep)){ # IM replicates
-  
-  scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
-                              peaks_total$c_rep == i &
-                           peaks_total$step == 200 & 
-                       peaks_total$walking == "greedy" &
-                       peaks_total$species == 1, "scape_rep"]
-  
-  for (j in unique(scape_reps)) { # fitness landscape replicates
-    
-    walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
-                              peaks_total$c_rep == i &
-                               peaks_total$scape_rep == j &
-                           peaks_total$step == 200 & 
-                       peaks_total$walking == "greedy" &
-                       peaks_total$species == 1, "walk_rep"]
-    
-    for (l in unique(walk_reps)) {
-      
-      ranks_sp1 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[3]][[l]][[1]][c(190:200), "rank"])
-      ranks_sp2 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[3]][[l]][[2]][c(190:200), "rank"])
-      
-      summary_temp <- data.frame(n = 2,
-                              k = 0,
-                              c = 1,
-                              c_rep = i,
-                              scape_rep = j,
-                              walk_rep = l,
-                              nb_in_cycle_sp1 = length(ranks_sp1), # should be 4?
-                              nb_in_cycle_sp2 = length(ranks_sp2), # should be 4?
-                              high_rank_sp1 = min(ranks_sp1),
-                              high_rank_sp2 = min(ranks_sp2),
-                              low_rank_sp1 = max(ranks_sp1),
-                              low_rank_sp2 = max(ranks_sp2),
-                              var_rank_sp1 = var(ranks_sp1),
-                              var_rank_sp2 = var(ranks_sp2),
-                              mean_rank_sp1 = mean(ranks_sp1),
-                              mean_rank_sp2 = mean(ranks_sp2),
-                           landscape_ID = interaction(2, 0, 1, i, j))
-      
-      cycles_nkc_201 <- rbind(cycles_nkc_201, summary_temp)
-      
-    }
-    
-  }
-  
-}
-
-# for N = 2, K = 1, C = 1
-cycles_nkc_211 <- NULL
-
-c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 1 & 
-                     peaks_total$step == 200 & 
-                       peaks_total$walking == "prop" &
-                       peaks_total$species == 1, "c_rep"]
-
-for (i in unique(c_rep)){ # IM replicates
-  
-  scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 1 & 
-                              peaks_total$c_rep == i &
-                           peaks_total$step == 200 & 
-                       peaks_total$walking == "prop" &
-                       peaks_total$species == 1, "scape_rep"]
-  
-  for (j in unique(scape_reps)) { # fitness landscape replicates
-    
-    walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 1 & peaks_total$c == 1 & 
-                              peaks_total$c_rep == i &
-                               peaks_total$scape_rep == j &
-                           peaks_total$step == 200 & 
-                       peaks_total$walking == "prop" &
-                       peaks_total$species == 1, "walk_rep"]
-    
-    for (l in unique(walk_reps)) {
-      
-      ranks_sp1 <- unique(peaks_nkcs_2111[[5]][[i]][[j]][[3]][[l]][[1]][c(190:200), "rank"])
-      ranks_sp2 <- unique(peaks_nkcs_2111[[5]][[i]][[j]][[3]][[l]][[2]][c(190:200), "rank"])
-      
-      summary_temp <- data.frame(n = 2,
-                              k = 1,
-                              c = 1,
-                              c_rep = i,
-                              scape_rep = j,
-                              walk_rep = l,
-                              nb_in_cycle_sp1 = length(ranks_sp1), # should be 4?
-                              nb_in_cycle_sp2 = length(ranks_sp2), # should be 4?
-                              high_rank_sp1 = min(ranks_sp1),
-                              high_rank_sp2 = min(ranks_sp2),
-                              low_rank_sp1 = max(ranks_sp1),
-                              low_rank_sp2 = max(ranks_sp2),
-                              var_rank_sp1 = var(ranks_sp1),
-                              var_rank_sp2 = var(ranks_sp2),
-                              mean_rank_sp1 = mean(ranks_sp1),
-                              mean_rank_sp2 = mean(ranks_sp2),
-                           landscape_ID = interaction(2, 1, 1, i, j))
-      
-      cycles_nkc_211 <- rbind(cycles_nkc_211, summary_temp)
-      
-    }
-    
-  }
-  
-}
-
-cycles_df <- rbind(cycles_nkc_201)
-cycles_df$cycle_ID <- interaction(cycles_df[, c("high_rank_sp1", "high_rank_sp2", "low_rank_sp1", "low_rank_sp2")])
-
-# I want to look at unique cycles (it is possible to have "multiple cycles" because of the specific interactions of networks 1 and 4 )
-summary_cycles <-  NULL
-
-for (scape_ID in unique(cycles_df$landscape_ID)){
-  
-  for (cycle_ID in unique(cycles_df[cycles_df$landscape_ID == scape_ID, "cycle_ID"])) {
-    
-    temp_df <- cycles_df[cycles_df$landscape_ID == scape_ID &
-                                              cycles_df$cycle_ID == cycle_ID, ]
-    
-    summary_temp <- data.frame(n = 2,
-                              k = unique(temp_df$k),
-                              c = unique(temp_df$c),
-                              c_rep = unique(temp_df$c_rep),
-                              scape_ID = scape_ID,
-                              cycle_ID = cycle_ID,
-                              nb_in_cycle_sp1 = mean(temp_df$nb_in_cycle_sp1),
-                              nb_in_cycle_sp2 = mean(temp_df$nb_in_cycle_sp2), 
-                              high_rank_sp1 = unique(temp_df$high_rank_sp1),
-                              high_rank_sp2 = unique(temp_df$high_rank_sp2),
-                              low_rank_sp1 = unique(temp_df$low_rank_sp1),
-                              low_rank_sp2 = unique(temp_df$low_rank_sp2),
-                              var_rank_sp1 = mean(temp_df$var_rank_sp1),
-                              var_rank_sp2 = mean(temp_df$var_rank_sp2),
-                              mean_rank_sp1 = mean(temp_df$mean_rank_sp1),
-                              mean_rank_sp2 = mean(temp_df$mean_rank_sp2),
-                              appeared = nrow(temp_df))
-    
-    summary_cycles <- rbind(summary_cycles, summary_temp)
-    
-  }
-  
-}
-
-
-ggplot(peaks_total[peaks_total$k == 0 &
-                     peaks_total$c == 1 &
-                     peaks_total$walking == "greedy" &
-                     peaks_total$species == 1,],
-       aes(y = step,
-           x = interaction(n, k, c))) +
-  geom_jitter(col = "forestgreen") +
-  ylab("steps") +
-  xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-ggplot(cycles_df,
-       aes(y = nb_in_cycle_sp1,
-           x = interaction(n,k,c),
-           group = interaction(n,k,c))) +
-  geom_violin() +
-  scale_y_continuous(name = "meteganotypes in cycle",
-                      limits = c(0,10),
-                      breaks = seq(0,10,2)) +
-   xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-
-ggplot(summary_cycles,
-       aes(y = var_rank_sp2,
-           x = interaction(n,k,c),
-           group = interaction(n,k,c))) +
-  geom_violin() +
-  geom_jitter(col = "forestgreen",
-              size = 2,
-              aes(alpha = appeared/80)) +
-  stat_summary(fun = mean,
-               geom = "crossbar", # adds the mean proportion for each rank/landscape
-               linewidth = 0.4,
-               col = "black") +
-  stat_summary(fun = median,
-               geom = "point", # adds the median proportion for each rank/landscape
-               shape = 18,
-               size = 3,
-               col = "black") +
-  scale_y_continuous(name = "var(fitness rank)",
-                     limits = c(0,30)) +
-   xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-ggplot(cycles_df,
-       aes(y = var_rank_sp2,
-           x = interaction(n,k,c),
-           group = landscape_ID)) +
-  geom_violin() +
-  scale_y_continuous(name = "var(fitness rank)") +
-   xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-ggplot(summary_cycles,
-       aes(y = high_rank_sp2,
-           x = interaction(n,k,c),
-           group = interaction(n,k,c))) +
-  geom_violin() +
-  geom_jitter(col = "forestgreen",
-              size = 2,
-              aes(alpha = appeared/80)) +
-  stat_summary(fun = mean,
-               geom = "crossbar", # adds the mean proportion for each rank/landscape
-               linewidth = 0.4,
-               col = "black") +
-  stat_summary(fun = median,
-               geom = "point", # adds the median proportion for each rank/landscape
-               shape = 18,
-               size = 3,
-               col = "black") +
-  scale_y_continuous(name = "var(fitness rank)",
-                     limits = c(1,16)) +
-   xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-ggplot(summary_cycles,
-       aes(x = interaction(n,k,c),
-           y = low_rank_sp1)) +
-  geom_violin(col = "orange") +
-  geom_violin(aes(x = interaction(n,k,c),
-           y = high_rank_sp1),
-              col = "purple") +
-  geom_violin(aes(x = interaction(n,k,c),
-           y = mean_rank_sp1),
-              col = "grey40") +
-  geom_jitter(size = 2,
-              col = "orange") +
-  geom_jitter(aes(x = interaction(n,k,c),
-           y = high_rank_sp1),
-                size = 2,
-              col = "purple") +
-  geom_jitter(aes(x = interaction(n,k,c),
-           y = mean_rank_sp1),
-                size = 2,
-              col = "grey40") +
-  scale_y_continuous(name = "fitness rank",
-                     limits = c(1,16),
-                     breaks = seq(1,16,2)) +
-  xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-library(reshape2)
-df <- melt(summary_cycles[, c("n", "k", "c", "cycle_ID", "scape_ID", "high_rank_sp1", "high_rank_sp2", "low_rank_sp1", "low_rank_sp2")],  
-           id.vars = c("n", "k", "c", "cycle_ID", "scape_ID"), 
-           variable.name = 'ranks')
-
-ggplot(df,
-       aes(x = interaction(n,k,c),
-           y = value,
-           group = ranks)) +
-  geom_violin(position = position_dodge(0.7),
-              aes(col = ranks)) +
-  geom_jitter(aes(col = ranks),
-              position = position_jitterdodge(0.3)) +
-  theme_bw() +
-  scale_color_manual(values=c("slateblue", "slateblue", "orange", "orange")) +
-  scale_y_continuous(name = "fitness rank",
-                     limits = c(1,16),
-                     breaks = seq(1,16,2)) +
-  xlab("N-K-C") +
-  fig_theme
-
-
-
-ggplot(summary_cycles,
-       aes(x = interaction(n,k,c),
-           y = mean_rank_sp1)) +
-  geom_violin() +
-  geom_jitter(col = "forestgreen") +
-  stat_summary(fun = mean,
-               geom = "crossbar", # adds the mean proportion for each rank/landscape
-               linewidth = 0.4,
-               col = "black") +
-  stat_summary(fun = median,
-               geom = "point", # adds the median proportion for each rank/landscape
-               shape = 18,
-               size = 3,
-               col = "black") +
-  theme_bw() +
-  xlab("N-K-C") +
-  scale_y_continuous(name = "fitness rank",
-                     limits = c(1,16),
-                     breaks = seq(1,16,2)) +
-  xlab("N-K-C") +
-  fig_theme
-
-```
-
-
-
-
-## correlation for R = 2
-
-```{r}
-
-ggplot(peaks_total_ranked2_summarised_R[peaks_total_ranked2_summarised_R$rank_sp1 != 17 &
-                                        !is.na(peaks_total_ranked2_summarised_R$corr_rank),],
-       aes(x = corr_rank,
-           y = rank_peaked/80)) +
-  geom_point(col = "forestgreen") +
-  facet_grid(c ~ k) +
-  scale_y_continuous(limits = c(0,1),
-                   name = "repeatability") +
-  xlab("correlation(rank F, rank P)") +
-  theme_bw() +
-  theme(panel.grid.minor.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
-  fig_theme
-
-
-### C = 2, R = 2
-combined_scapes_nkc_202_R <- list()
-summary_cors_nkc_202_R <- NULL
-
-for (i in 1:1){ # for each interaction matrix
-  
-  combined_scapes_nkc_202_R[[i]] <- list()
-  
-for (j in 1:50){ # for each landscape replicate - should be 200!
-  
-  scape_sp1 <- peaks_nkcs_2021_R[[4]][[i]][[j]][[1]]
-
-# rename columns, so I can combine the landscapes of both species
-colnames(scape_sp1)[c(7,8)] <- c("fitness_sp1", "rank_sp1")
-
-scape_sp2 <- peaks_nkcs_2021_R[[4]][[i]][[j]][[2]]
-scape_sp2 <- scape_sp2[with(scape_sp2, order(P.1, P.2, F.1, F.2)), ] # reordering the loci, so they are in the same order as for sp 1
-
-# combine sp1 and sp2
-test_df <- cbind(scape_sp1, scape_sp2[,c(7,8)])
-colnames(test_df)[c(9,10)] <- c("fitness_sp2", "rank_sp2")
-
-summary_temp <- data.frame(n = 2,
-                              k = 0,
-                              c = 1,
-                              c_rep = i,
-                              scape_rep = j,
-                              corr = cor(test_df$rank_sp1, test_df$rank_sp2),
-                           landscape_ID = interaction(2, 0, 1, i, j))
-
-summary_cors_nkc_202_R <- rbind(summary_cors_nkc_202_R, summary_temp)
-
-combined_scapes_nkc_202_R[[i]][[j]] <- test_df
-  
-}
-}
-
-
-for (ID in summary_cors_nkc_202_R$landscape_ID){
-  
-  mean_rank1 <- mean(peaks_total_ranked2_summarised_R[peaks_total_ranked2_summarised_R$landscape_ID == ID, "rank_sp1"])
-    mean_rank2 <- mean(peaks_total_ranked2_summarised_R[peaks_total_ranked2_summarised_R$landscape_ID == ID, "rank_sp2"])
-    
-    summary_cors_nkc_202_R[summary_cors_nkc_201_R$landscape_ID == ID, "mean_rank1"] <- mean_rank1
-    summary_cors_nkc_202_R[summary_cors_nkc_201_R$landscape_ID == ID, "mean_rank2"] <- mean_rank2
-
-}
-
-ggplot(summary_cors_nkc_202_R,
-       aes(x = corr,
-           y = mean_rank1)) +
-   geom_segment(aes(x = corr, 
-      y = mean_rank1, 
-      xend = corr, 
-      yend = mean_rank2),
-      col = "grey",
-      alpha = 0.7) +
-  geom_point(col = "dodgerblue") +
-  geom_point(aes(x = corr,
-                 y = mean_rank2),
-             col = "purple") +
-  scale_y_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
-                     breaks = c(1:17),
-                   name = "mean fitness rank") +
-  xlab("correlation(rank F, rank P)") +
-  theme_bw() +
-  theme(panel.grid.minor.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
-  fig_theme
-
-
-
-ggplot(summary_cors_nkc_202_R[summary_cors_nkc_202_R$mean_rank1 != 17,],
-       aes(x = corr,
-           y = abs(mean_rank1-mean_rank2))) +
-  geom_point(col = "dodgerblue") +
-  scale_y_continuous(labels = c("0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
-                     breaks = c(0:17),
-                   name = "difference in mean fitness rank") +
-  xlab("correlation(rank F, rank P)") +
-  theme_bw() +
-  theme(panel.grid.minor.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
-  fig_theme
-
-
-```
- 
-
-# 3.) Supplementary figures
-## Repeatability N' = 4
-```{r}
-localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
-                                       peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
-        aes(y = prop_rank_peaked,
-            x = rank,
-            group = rank)) +
-     theme_bw() +
+community_rep <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$n == 2 &
+                                                         peaks_total_ranked2_summarised$rank_sp1 != 17,], 
+        aes(y = rank_peaked/80,
+            x = (rank_sp1 + rank_sp2)/2,
+            group = (rank_sp1 + rank_sp2)/2)) +
   geom_violin(col = "grey45") +
   geom_jitter(col = "springgreen4",
               size = 2.5,
@@ -1226,29 +1497,92 @@ localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
                shape = 18,
                size = 3,
                col = "black") +
-  facet_grid( ~ k) +
-  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
+     theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :-)
                      breaks = c(1:17),
-                   name = "Fitness rank at the end of adaptive walk",
-                   limits = c(0.5,17.5),
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
-                                       breaks = NULL, labels = NULL)) +
-  scale_y_continuous(name = "Proportion of adaptive walks/landscape") +
-  theme(axis.title.y.right = element_text(angle = 0, vjust = 0.5),
-        axis.title.y = element_text(size=16),
+                   name = "Community fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = "intragenomic epistasis, K", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of adaptive walks/landscape",
+                   sec.axis = sec_axis(~ . , name = "intergenomic epistasis, C", breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
         axis.title.y.left = element_markdown(),
         text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
   fig_theme
+
+for (ID in unique(summary_cycles$scape_ID)){
+  
+  if (ID %in% summary_cycles$scape_ID) {
+    
+    summary_cycles[summary_cycles$scape_ID == ID, "corr_rank"] <- unique(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$landscape_ID == ID, "corr_rank"])
+    
+  }
+  
+  
+}
+
+```
+
+
+# 3.) Supplementary figures
+## effect IM N' = 4
+```{r}
+
+effectIM_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
+                                         peaks_total_ranked_summarised$k != 3 &
+                                       peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = rank)) +
+  geom_violin(col = "grey45") +
+  geom_jitter(aes(col = as.factor(k_rep)),
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.5) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+     theme_bw() +
+  facet_grid(k_rep ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :-)
+                     breaks = c(1:17),
+                     limits = c(1,17),
+                   name = "Fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic("K"))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of adaptive walks/landscape",
+                     limits = c(0,1)) +
+  scale_color_manual(values=c("forestgreen", "limegreen", "darkseagreen","olivedrab2", "gold")) + # different colours for the four interaction networks
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y.left = ggtext::element_markdown(),
+        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=24),
+        strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0),
+        legend.position = "none",
+        text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
 
 
 ggsave(path = "../Figures/",
        device = cairo_pdf, # to save pdf with unicode
        units = c("cm"),
-       width = 37,
-       height = 10,
-       filename = "localrep_N4.pdf",
-       plot = localrep_N4)
+       width = 26,
+       height = 21,
+       filename = "effectIM_N2.pdf",
+       plot = effectIM_N2)
+
 ```
+
 
 ## Ruggedness - roughness to slope 
 ```{r}
@@ -1656,18 +1990,18 @@ ruggedness <- ggplot(ruggedness_df,
                             "2.0.4" = "4-2-0",
                             "3.0.4" = "4-3-0")) +
   xlab("N-K-C") +
-  ylab("log(roughness/slope)")+
+  ylab(substitute(paste(log[10], "(roughness/slope)")))+
   theme_bw() +
   fig_theme +
   theme(panel.grid.major.x = element_blank())
 
-# ggsave(path = "../Figures/",
-#        device = cairo_pdf, # to save pdf with unicode
-#        units = c("cm"),
-#        width = 30,
-#        height = 10,
-#        filename = "ruggedness.pdf",
-#        plot = ruggedness)
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 30,
+       height = 10,
+       filename = "ruggedness.pdf",
+       plot = ruggedness)
 
 ```
 
@@ -1703,7 +2037,7 @@ ruggedness_c1 <- ggplot(ruggedness_df_c1,
   scale_x_discrete(labels=c("2-0-1", "2-1-1"),
                    breaks = c("2.0.1.2", "2.1.1.2")) +
   xlab("N-K-C") +
-  ylab("log(roughness/slope)")+
+  ylab(substitute(paste(log[10], "(roughness/slope)")))+
   theme_bw() +
   fig_theme +
   theme(panel.grid.major.x = element_blank())
@@ -1772,7 +2106,6 @@ ggsave(path = "../Figures/",
 ## ruggedness - outcome
 ```{r}
 
-
 rug_out <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank),],
        aes(x = rugg,
            y = rank_sp1)) +
@@ -1801,7 +2134,7 @@ rug_out <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summ
        sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
                            breaks = NULL, labels = NULL)) +
   theme_bw() +
-  theme(axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
         text = element_text(family = "Arial Unicode MS")) +
   fig_theme
 
@@ -1854,7 +2187,7 @@ ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr
 ## Greedy Repeatability N = 2
 ```{r}
 localrep_N2_greedy <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
-                                       peaks_total_ranked_summarised$walking == "greedy",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "greedy",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -1922,7 +2255,7 @@ ggsave(path = "../Figures/",
 ## Random Repeatability N = 2
 ```{r}
 localrep_N2_random <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
-                                       peaks_total_ranked_summarised$walking == "random",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -2038,7 +2371,7 @@ ggsave(path = "../Figures/",
 ## R = 2 - fitness distribution
 ```{r}
 fitness_dis_N2_R <- ggplot(peaks_total_ranked_summarised_R[peaks_total_ranked_summarised_R$n == 2 &
-                                       peaks_total_ranked_summarised_R$walking == "prop",], # only true walks in main text
+                                       peaks_total_ranked_summarised_R$walking == "prop",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -2075,26 +2408,46 @@ ggsave(path = "../Figures/",
 
 ## correlation - fitness outcomes -> full figure
 ```{r}
-eco_outcomes <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank),],
-       aes(x = corr_rank,
+eco_outcomes <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank) &
+                                                        peaks_total_ranked2_summarised$rank_sp1 != 17,],
+   aes(x = corr_rank,
            y = rank_sp1)) +
    geom_segment(aes(x = corr_rank, 
       y = rank_sp1, 
       xend = corr_rank, 
-      yend = rank_sp2),
-      col = "grey40",
-      alpha = 0.8) +
+      yend = rank_sp2,
+      alpha = rank_peaked/80),
+      col = "grey40") +
+  geom_segment(data = summary_cycles,
+               aes(x = corr_rank, 
+      y = mean_rank_sp1, 
+      xend = corr_rank, 
+      yend = mean_rank_sp2,
+      alpha = appeared/80),
+      col = "grey40") +
   geom_point(col = "forestgreen",
-             size = 2,
+             size = 2.5,
              aes(alpha = rank_peaked/80)) +
   geom_point(aes(x = corr_rank,
                  y = rank_sp2,
                  alpha = rank_peaked/80),
                  col = "forestgreen",
-             size = 2) +
+             size = 2.5) +
+  geom_point(data = summary_cycles,
+             aes(x = corr_rank,
+                 y = mean_rank_sp1,
+                 alpha = appeared/80),
+             col = "skyblue",
+             size = 2.5) +
+  geom_point(data = summary_cycles,
+             aes(x = corr_rank,
+                 y = mean_rank_sp2,
+                 alpha = appeared/80),
+             col = "skyblue",
+             size = 2.5) +
   facet_grid(c ~ k) +
-  scale_y_continuous(labels = c("1", "3", "5", "7", "9", "11", "13", "15", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :-)
-                     breaks = seq(1, 17, 2),
+  scale_y_continuous(labels = c("1", "3", "5", "7", "9", "11", "13", "15"), 
+                     breaks = seq(1, 15, 2),
                    name = "Fitness rank at the end of adaptive walk",
                    sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
                                        breaks = NULL, labels = NULL)) +
@@ -2112,7 +2465,7 @@ eco_outcomes <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2
                    panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
-        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y.right = element_text(angle = 90, vjust = 0.5),
         text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
 
 
@@ -2188,7 +2541,7 @@ ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr
 
 effectIM_fit_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                          peaks_total_ranked_summarised$c == 1 &
-                                       peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "prop",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -2227,6 +2580,7 @@ ggsave(path = "../Figures/",
        plot = effectIM_fit_N2)
 
 ```
+
 
 ## correlation R = 2
 ```{r}
@@ -2267,7 +2621,7 @@ combined_scapes_nkc_201_R[[i]][[j]] <- test_df
 }
 }
 
-
+###
 combined_scapes_nkc_211_R <- list()
 summary_cors_nkc_211_R <- NULL
 
@@ -2304,7 +2658,77 @@ combined_scapes_nkc_211_R[[i]][[j]] <- test_df
 }
 }
 
-summary_cors_R <- rbind(summary_cors_nkc_211_R, summary_cors_nkc_201_R)
+###
+combined_scapes_nkc_202_R <- list()
+summary_cors_nkc_202_R <- NULL
+
+combined_scapes_nkc_202_R[[1]] <- list()
+  
+for (j in 1:200){ # for each landscape replicate
+  
+  scape_sp1 <- peaks_nkcs_2021_R[[4]][[1]][[j]][[1]]
+
+# rename columns, so I can combine the landscapes of both species
+colnames(scape_sp1)[c(7,8)] <- c("fitness_sp1", "rank_sp1")
+
+scape_sp2 <- peaks_nkcs_2021_R[[4]][[1]][[j]][[2]]
+scape_sp2 <- scape_sp2[with(scape_sp2, order(P.1, P.2, F.1, F.2)), ] # reordering the loci, so they are in the same order as for sp 1
+
+# combine sp1 and sp2
+test_df <- cbind(scape_sp1, scape_sp2[,c(7,8)])
+colnames(test_df)[c(9,10)] <- c("fitness_sp2", "rank_sp2")
+
+summary_temp <- data.frame(n = 2,
+                              k = 0,
+                              c = 2,
+                              c_rep = 1,
+                              scape_rep = j,
+                              corr = cor(test_df$rank_sp1, test_df$rank_sp2),
+                           landscape_ID = interaction(2, 0, 2, 1, j))
+
+summary_cors_nkc_202_R <- rbind(summary_cors_nkc_202_R, summary_temp)
+
+combined_scapes_nkc_202_R[[1]][[j]] <- test_df
+  
+}
+
+###
+combined_scapes_nkc_212_R <- list()
+summary_cors_nkc_212_R <- NULL
+
+combined_scapes_nkc_212_R[[1]] <- list()
+  
+for (j in 1:200){ # for each landscape replicate
+  
+  scape_sp1 <- peaks_nkcs_2121_R[[4]][[1]][[j]][[1]]
+
+# rename columns, so I can combine the landscapes of both species
+colnames(scape_sp1)[c(7,8)] <- c("fitness_sp1", "rank_sp1")
+
+scape_sp2 <- peaks_nkcs_2121_R[[4]][[1]][[j]][[2]]
+scape_sp2 <- scape_sp2[with(scape_sp2, order(P.1, P.2, F.1, F.2)), ] # reordering the loci, so they are in the same order as for sp 1
+
+# combine sp1 and sp2
+test_df <- cbind(scape_sp1, scape_sp2[,c(7,8)])
+colnames(test_df)[c(9,10)] <- c("fitness_sp2", "rank_sp2")
+
+summary_temp <- data.frame(n = 2,
+                              k = 1,
+                              c = 2,
+                              c_rep = 1,
+                              scape_rep = j,
+                              corr = cor(test_df$rank_sp1, test_df$rank_sp2),
+                           landscape_ID = interaction(2, 1, 2, 1, j))
+
+summary_cors_nkc_212_R <- rbind(summary_cors_nkc_212_R, summary_temp)
+
+combined_scapes_nkc_212_R[[1]][[j]] <- test_df
+  
+}
+
+
+######
+summary_cors_R <- rbind(summary_cors_nkc_211_R, summary_cors_nkc_201_R, summary_cors_nkc_202_R, summary_cors_nkc_212_R)
 
 for (i in 1:nrow(peaks_total_ranked2_summarised_R[, ])){
   
@@ -2336,12 +2760,12 @@ eco_outcomes_R <- ggplot(peaks_total_ranked2_summarised_R[!is.na(peaks_total_ran
                  col = "forestgreen",
              size = 2) +
   facet_grid(c ~ k) +
-  scale_y_continuous(labels = c("1", "3", "5", "7", "9", "11", "13", "15", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
+  scale_y_continuous(labels = c("1", "3", "5", "7", "9", "11", "13", "15", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :-)
                      breaks = seq(1, 17, 2),
                    name = "Fitness rank at the end of adaptive walk",
-                   sec.axis = sec_axis(~ . , name = "C", breaks = NULL, labels = NULL)) +
+                   sec.axis = sec_axis(~ . , name = "intergenomic epustasis, C", breaks = NULL, labels = NULL)) +
   scale_x_continuous(name = "rank correlation(F, P)",
-                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL),
+                   sec.axis = sec_axis(~ . , name = "intragenomic epistasis, K", breaks = NULL, labels = NULL),
                    limits = c(-1,1)) +
   theme_bw() +
   theme(axis.text.x.bottom = element_text(size=16),
@@ -2353,7 +2777,7 @@ eco_outcomes_R <- ggplot(peaks_total_ranked2_summarised_R[!is.na(peaks_total_ran
                    panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.y = element_blank(),
-        axis.title.y.right = element_text(angle = 0, vjust = 0.5),
+        axis.title.y.right = element_text(angle = 90, vjust = 0.5),
         text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
 
 
@@ -2480,7 +2904,7 @@ ggsave(path = "../Figures/",
 ## Visualising cycles
 ```{r}
 # walk example 
-cycle_walk <- peaks_nkcs_2011[[5]][[4]][[17]][[1]][[1]]
+cycle_walk <- peaks_nkcs_2011[[5]][[4]][[  ]][[1]][[1]]
 
 cycle_df <- data.frame(rank_sp1 = cycle_walk[[1]][,"rank"],
                          rank_sp2 = cycle_walk[[2]][,"rank"],
@@ -2514,20 +2938,20 @@ ggsave(path = "../Figures/",
 ## N = 4 fitness distribution
 ```{r}
 fitness_dis_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
-                                       peaks_total_ranked_summarised$walking == "prop",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "prop",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
   geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
                group = 1),
-           fill = "thistle3") + # across all my groupings
+           fill = "forestgreen") + # across all my groupings
      theme_bw() +
   facet_grid( ~ k) +
-  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :)
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replaced by "cycle" - I just like this :-)
                      breaks = c(1:17),
-                   name = "Fitness rank focal species",
+                   name = "Fitness rank at the end of adaptive walk",
                    limits = c(0.5,17.5),
-                   sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
+                   sec.axis = sec_axis(~ . , name = "K'", breaks = NULL, labels = NULL)) +
   scale_y_continuous(name = "Proportion of overall outcomes",
                      limits = c(0,1)) +
   theme(panel.grid.minor.x = element_blank(),
@@ -2549,7 +2973,7 @@ ggsave(path = "../Figures/",
 ## fitness distribution - greedy
 ```{r}
 fitness_dis_N2_greedy <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
-                                       peaks_total_ranked_summarised$walking == "greedy",], # only true walks in main text
+                                       peaks_total_ranked_summarised$walking == "greedy",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -2581,10 +3005,10 @@ ggsave(path = "../Figures/",
 
 ```
 
-## fitness distribution - random
+## fitness distribution - true
 ```{r}
-fitness_dis_N2_random <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
-                                       peaks_total_ranked_summarised$walking == "random",], # only true walks in main text
+fitness_dis_N2_true <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                       peaks_total_ranked_summarised$walking == "prop",], # only random walks in main text
         aes(y = prop_rank_peaked,
             x = rank,
             group = rank)) +
@@ -2611,8 +3035,196 @@ ggsave(path = "../Figures/",
        units = c("cm"),
        width = 26, # 30
        height = 17, # 15
-       filename = "fitness_dis_N2_random.pdf",
-       plot = fitness_dis_N2_random)
+       filename = "fitness_dis_N2_true.pdf",
+       plot = fitness_dis_N2_true)
+
+```
+
+## fitness distribution -random
+Here we show which fitness outcomes are the most common, which gives us the expected fitness distribution for each combination of K and C; this figure also shows the cycling probability
+```{r}
+fitness_dis_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                       peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
+        aes(y = prop_rank_peaked,
+            x = rank,
+            group = rank)) +
+  geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
+               group = 1),
+           fill = "thistle3") + # across all my groupings
+     theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :-)
+                     breaks = c(1:17),
+                   name = "Fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of overall outcomes",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
+  fig_theme
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 26, # 30
+       height = 17, # 15
+       filename = "fitness_dis_N2.pdf",
+       plot = fitness_dis_N2)
+
+```
+
+
+# cycle summary stats
+```{r}
+
+# steps in adaptive walk
+ggplot(peaks_total[peaks_total$walking == "random" &
+                     peaks_total$species == 1,], # to reduce redundancy - only one point per simulation
+       aes(x = interaction(k, c, n),
+           y = step)) +
+  geom_jitter(col = "forestgreen",
+              alpha = 0.6,
+              size = 2.5) +
+  scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-C") +
+  ylab("Steps in adaptive walk") +
+  theme_bw() +
+  fig_theme
+
+
+walks_steps <- ggplot(peaks_total[peaks_total$species == 1,], # to reduce redundancy - only one point per simulation
+       aes(x = interaction(k, c, n),
+           y = step)) +
+  geom_jitter(aes(col = walking),
+              alpha = 0.5,
+              size = 2.5) +
+  scale_color_manual(values=c("grey60", "grey", "forestgreen")) +
+  facet_grid(walking~.,
+             labeller = labeller(walking = 
+    c("greedy" = "greedy",
+      "prop" = "true",
+      "random" = "random"))) +
+  scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-C") +
+  ylab("Steps in adaptive walk") +
+  theme_bw() +
+  theme(strip.text.y.right = element_text(angle = 90)) +
+  fig_theme
+
+ggsave(path = "../Figures/",
+       units = c("cm"),
+       width = 19,
+       height = 17,
+       filename = "walks_steps.pdf",
+       plot = walks_steps)
+
+# size of cycles
+cycle_size <- ggplot(cycles_df,
+       aes(y = nb_in_cycle_sp1,
+           x = interaction(k,c,n),
+           group = interaction(k,c,n))) +
+  geom_violin() +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  scale_y_continuous(name = "Meteganotypes in cycle",
+                      limits = c(0,16),
+                      breaks = seq(0,16,2)) +
+   scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-C") +
+  theme_bw() +
+  fig_theme
+
+ggsave(path = "../Figures/",
+       units = c("cm"),
+       width = 19,
+       height = 12,
+       filename = "cycle_size.pdf",
+       plot = cycle_size)
+
+
+
+
+library(reshape2)
+df <- melt(summary_cycles[, c("n", "k", "c", "cycle_ID", "scape_ID", "high_rank_sp1", "high_rank_sp2", "low_rank_sp1", "low_rank_sp2")],  
+           id.vars = c("n", "k", "c", "cycle_ID", "scape_ID"), 
+           variable.name = 'ranks')
+
+ggplot(df,
+       aes(x = interaction(n,k,c),
+           y = value,
+           group = interaction(n,k,c,ranks))) +
+  geom_violin(position = position_dodge(0.7),
+              aes(col = ranks)) +
+  geom_jitter(aes(col = ranks),
+              position = position_jitterdodge(0.3)) +
+  theme_bw() +
+  scale_color_manual(values=c("slateblue", "slateblue", "orange", "orange")) +
+  scale_y_continuous(name = "fitness rank",
+                     limits = c(1,16),
+                     breaks = seq(1,16,2)) +
+  xlab("N-K-C") +
+  fig_theme
+
+
+
+ggplot(summary_cycles,
+       aes(x = interaction(n,k,c),
+           y = mean_rank_sp1)) +
+  geom_violin() +
+  geom_jitter(col = "forestgreen",
+              size = 2,
+              alpha = 0.6) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  theme_bw() +
+  xlab("N-K-C") +
+  scale_y_continuous(name = "mean fitness rank",
+                     limits = c(1,16),
+                     breaks = seq(1,16,2)) +
+  xlab("N-K-C") +
+  fig_theme
 
 ```
 
@@ -2622,7 +3234,7 @@ ggsave(path = "../Figures/",
 ```{r}
 # how many outcomes are there on the same landscape?
 true_only_summed2 <- as.data.frame(peaks_total_ranked2_summarised |> 
-                            dplyr::group_by(k, c, n, landscape_ID, ) |>
+                            dplyr::group_by(k, c, n, c_rep, landscape_ID, ) |>
                             dplyr::summarise(outcomes = n())) 
 
 # K = 1, C = 0
@@ -2651,6 +3263,62 @@ mult_peak2 <- nrow(true_only_summed2[true_only_summed2$k == 1 &
                             true_only_summed2$c == 2 &
                             true_only_summed2$outcomes > 1,]) # tot = 200
 
+no_outcomes <- ggplot(true_only_summed2,
+       aes(y = outcomes,
+           x = interaction(k,c,n),
+           group = interaction(k,c,n))) +
+  geom_violin() +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  scale_y_continuous(name = "No. of realised outcomes",
+                      limits = c(0,5)) +
+   scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-C") +
+  theme_bw() +
+  fig_theme
+
+ggsave(path = "../Figures/",
+       units = c("cm"),
+       width = 14,
+       height = 12,
+       filename = "no_outcomes.pdf",
+       plot = no_outcomes)
+
+no_outcomes_IM <- ggplot(true_only_summed2[true_only_summed2$c == 1,],
+       aes(y = outcomes,
+           x = c_rep,
+           group = c_rep)) +
+  geom_violin(aes(col = as.factor(c_rep))) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  scale_y_continuous(name = "No. of realised outcomes",
+                      limits = c(0,5)) +
+  facet_grid(~k) +
+  xlab("N-K-C") +
+  theme_bw() +
+  fig_theme
 
 ## same but with R = 2
 # how many outcomes are there on the same landscape?
@@ -2765,7 +3433,7 @@ ggplot(coef_df,
 # 5.) Additional figures
 ## Fitness landscape example; "classic" version
 ```{r}
-example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[2]][[27]], # I recode the alleles into as and bs in Adobe Illustrator O:-)
+example_scape_fig <- visualise_system(peaks_nkcs_2011[[4]][[1]][[13]], # I recode the alleles into as and bs in Adobe Illustrator O:-)
                  n = 2,
                  c = 1,
                  s = 1,
@@ -2775,13 +3443,92 @@ example_scape_fig <- visualise_system(peaks_nkcs_2111[[4]][[2]][[27]], # I recod
                         axis.title = element_text(size=25 ),
         strip.text.x = element_text(size=25))
 
-# ggsave(path = "../Figures/",
-#        device = "pdf",
-#        units = c("cm"),
-#        width = 35,
-#        height = 14,
-#        filename = "scapes_NKC_201_2_17.pdf",
-#        plot = example_scape_fig)
+ggsave(path = "../Figures/",
+       device = "pdf",
+       units = c("cm"),
+       width = 35,
+       height = 14,
+       filename = "scapes_NKC_201_1_13.pdf",
+       plot = example_scape_fig)
+```
+
+```{r}
+# recoding fitness landscapes; 
+## in my model the alleles are encoded as 1 and 2, but I would different alleles for the two species to better distinguish them (differences in metagenotypes should be easier to spot this way)
+
+scape_sp1 <- peaks_nkcs_2011[[4]][[1]][[13]][[1]] # take desired landscape replicate for species 1 = "focal species"
+
+# recode alleles for focal species 
+scape_sp1[scape_sp1$F.1 == 1, "F.1"] <- "a" 
+scape_sp1[scape_sp1$F.1 == 2, "F.1"] <- "A"
+scape_sp1[scape_sp1$F.2 == 1, "F.2"] <- "a"
+scape_sp1[scape_sp1$F.2 == 2, "F.2"] <- "A"
+
+# recode alleles for partner species
+scape_sp1[scape_sp1$P.1 == 1, "P.1"] <- "b"
+scape_sp1[scape_sp1$P.1 == 2, "P.1"] <- "B"
+scape_sp1[scape_sp1$P.2 == 1, "P.2"] <- "b"
+scape_sp1[scape_sp1$P.2 == 2, "P.2"] <- "B"
+
+# rename columns, so I can combine the landscapes of both species next
+colnames(scape_sp1)[c(7,8)] <- c("fitness_sp1", "rank_sp1")
+
+# take the corresponding fitness landscape of species 2 in the chosen species pair
+scape_sp2 <- peaks_nkcs_2011[[4]][[1]][[13]][[2]]
+scape_sp2 <- scape_sp2[with(scape_sp2, order(P.1, P.2, F.1, F.2)), ] # reordering the loci, so they are in the same order as for sp 1
+
+# combine landscaps of sp1 and sp2
+scapes_combined <- cbind(scape_sp1, scape_sp2[,c(7,8)])
+colnames(scapes_combined)[c(9,10)] <- c("fitness_sp2", "rank_sp2") # adjust column names
+
+# get the metagenotypes, so I can plot them; this is just for text in the plot
+for (i in 1:16){
+  
+  scapes_combined$seq[i] <- paste(paste(scapes_combined[i, c("F.1", "F.2")], collapse = ""), "-", c(paste(scapes_combined[i, c("P.1", "P.2")], collapse = "")))
+  
+}
+
+scapes_combined$background <- paste0(scapes_combined$P.1, scapes_combined$P.2) # genotype of sp2
+scapes_combined$gen <- paste0(scapes_combined$F.1, scapes_combined$F.2) # genotype of sp1
+
+# now I use my function from the NKC(S) code file to infer which metagenotypes are one-mutation step neighbours
+visual_test_df <- visual_landscape(scapes_combined,
+                 n = 2,
+                  c = 1,
+                 s = 1) # this is how I get the transitions between metagenotypes
+
+parallel_scape <- ggplot(visual_test_df,
+       aes(x = mutations,
+           y = fitness)) +
+  geom_line(data = visual_test_df,
+            aes(group = group,
+                linetype = mut),
+            color="grey70",
+            linewidth = 1) +
+  geom_label(label = visual_test_df$seq,
+             aes(col = background),
+             linewidth = 0.6, # thickness of label border in mm
+             size = 4.5, # size of label in mm
+             fontface = "bold" # bold font
+             ) +
+  scale_linetype_manual(breaks = c("intra", "inter"),
+                        values = c("solid", "dashed"))+
+  xlab("Hamming distance from reference metagenotype") +
+  ylab("Fitness") +
+    facet_wrap(~species,
+               labeller = labeller(species = 
+    c("1" = "Focal species",
+      "2" = "Partner species"))) +
+  theme_bw() +
+  theme(legend.position = "none",
+        panel.grid.major.y = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(linewidth = 0.8, linetype = 2),
+        panel.grid.minor.x = element_blank(),
+        text = element_text(size = 15),
+        axis.text = element_text(size = 13))
+
+
 ```
 
 ## Network representation of adaptive walks
@@ -2923,7 +3670,7 @@ graph <- ggraph::ggraph(g,
 
 ## Community fitness
 ```{r}
-community_pattern <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$n == 2,], # only true walks in main text
+community_pattern <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$n == 2,], # only random walks in main text
         aes(y = rank_peaked/80,
             x = (rank_sp1 + rank_sp2)/2,
             group = (rank_sp1 + rank_sp2)/2)) +
@@ -2931,7 +3678,7 @@ community_pattern <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_s
                group = 1),
            fill = "thistle3") + # across all my groupings
   geom_violin(col = "grey45") +
-  geom_jitter(col = "springgreen4",
+  geom_jitter(col = "forestgreen",
               size = 2.5,
               height = 0.01,
               alpha = 0.3) +
@@ -2946,9 +3693,9 @@ community_pattern <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_s
                col = "black") +
      theme_bw() +
   facet_grid(c ~ k) +
-  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :)
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :-)
                      breaks = c(1:17),
-                   name = "Cpmmunity fitness rank at the end of adaptive walk",
+                   name = "Community fitness rank at the end of adaptive walk",
                    sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
   scale_y_continuous(name = "<span style='color:thistle4'> Proportion of overall outcomes </span>  \nProportion of adaptive walks/landscape",
                    sec.axis = sec_axis(~ . , name = "C", breaks = NULL, labels = NULL)) +
@@ -2964,6 +3711,35 @@ ggsave(path = "../Figures/",
        height = 17,
        filename = "community_pattern.pdf",
        plot = community_pattern)
+
+####
+community_outcomes <- ggplot(peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$n == 2,], # only random walks in main text
+        aes(y = rank_peaked/80,
+            x = (rank_sp1 + rank_sp2)/2,
+            group = (rank_sp1 + rank_sp2)/2)) +
+  geom_bar(aes(y = after_stat(prop), # proportion of data points at each rank (calculated for each facet)
+               group = 1),
+           fill = "thistle3") + # across all my groupings
+     theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :-)
+                     breaks = c(1:17),
+                   name = "Community fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = "intragenomic epistasis, K", breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of overall outcomes",
+                   sec.axis = sec_axis(~ . , name = "intergenomic epistasis, C", breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        axis.title.y.left = element_markdown(),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
+  fig_theme
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode
+       units = c("cm"),
+       width = 26,
+       height = 17,
+       filename = "community_outcomes.pdf",
+       plot = community_outcomes)
 
 
 ```
