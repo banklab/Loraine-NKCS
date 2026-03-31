@@ -12,7 +12,7 @@ knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_sc
 
 # Set up workspace
 ```{r libraries}
-rm (list = ls())
+rm (list = ls()) # clear environment
 
 library(ggplot2) # for plotting
 library(dplyr) # for constructing the data sets
@@ -27,7 +27,6 @@ library(ggpubr) # to arrange multiple figures
 library(egg) # to make plot insets
 
 library(glmmTMB) # for mixed effect models
-library(effects) # to calculate estimates of mixed effect models
 
 # load NKC functions
 source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # to get the landscape visualisation functions for example
@@ -37,69 +36,7 @@ load("peaks_total7")
 
 ```
 
-# 1.) Exploratory plots
-```{r}
-### some exploratory plots
-
-# how many species reach the global peak (0/1/2)
-ggplot(peaks_summarised,
-        aes(y = prop_reached,
-            x = interaction(peaked, n, k, c),
-            fill = walking)) +
-     geom_boxplot() +
-     theme_bw()
-
-# when does cycling occur?
-ggplot(peaks_summarised,
-        aes(y = prop_cycled,
-            x = interaction(peaked, n, k, c),
-            fill = walking)) +
-     geom_boxplot() +
-     theme_bw()
-
-# how often does cycling occur?
-ggplot(peaks_summarised_cycles,
-        aes(y = prop_cycles,
-            x = interaction(peaked, n, k, c),
-            fill = walking)) +
-     geom_boxplot() +
-     theme_bw()
-
-ggplot(peaks_summarised2[peaks_summarised$cycle_count > 0,],
-        aes(y = prop_cycled,
-            x = interaction(n, k, c),
-            fill = walking)) +
-     geom_boxplot() +
-     theme_bw()
-
-# individual replicates reaching peak
-ggplot(peaks_summarised,
-        aes(y = prop_reached,
-            x = interaction(peaked, n, k, c),
-            col = walking)) +
-     geom_jitter() +
-     theme_bw()
-
-# how many steps in the adaptive walks?
-ggplot(peaks_total[peaks_total$reached == TRUE,], # for those that reached the global peak
-       aes(y = step,
-           x = interaction(n, k, c),
-           col = walking,
-           shape = as.factor(species))) +
-  geom_jitter() +
-  theme_bw()
-
-ggplot(peaks_total[peaks_total$species == 1,], # only plotting one species to make it less clustered
-       aes(y = step,
-           x = interaction(n, k, c),
-           col = walking)) +
-  geom_jitter() +
-  theme_bw()
-
-
-```
-
-# 2.) Plots for manuscript
+# 1.) Plots for manuscript
 ```{r}
 # main theme for all my figures
 fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
@@ -118,7 +55,7 @@ fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
 ```
 
 ## Fig. 3 - fitness landscape example; R^2 version
-This figure shows us the two-dimensional fitness mapping for all the metagenotype -> each metagenotype can correspond to a different fitness rank for the two species
+This figure shows us the two-dimensional fitness mapping for all the metagenotypes in a community -> each metagenotype can correspond to a different fitness rank for the two species
 ```{r}
 # recoding fitness landscapes; 
 ## in my model the alleles are encoded as 1 and 2, but I would different alleles for the two species to better distinguish them (differences in metagenotypes should be easier to spot this way)
@@ -195,6 +132,7 @@ lanscape_Rsqrd <- ggplot(visual_test_df,
   theme_classic() +
   fig_theme
 
+# to save the figure
 ggsave(path = "../Figures/",
        device = "pdf",
        units = c("cm"),
@@ -314,18 +252,18 @@ ggsave(path = "../Figures/",
 ```
 
 ## Fig 4a - Repeatability N = 2
-This is the first results figure that shows how many adaptive walks lead to the same outcome on each of our fitness lanscape replicates
+This is the first results figure that shows how many adaptive walks lead to the same outcome on each of our fitness landscape replicates. Here we see the number of realised outcomes of adaptation as well as how often they are repeated on the same landscape
 ```{r}
 localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
-        aes(y = prop_rank_peaked,
+        aes(y = prop_rank_peaked, # plot proportions
             x = rank,
             group = rank)) +
   geom_violin(col = "grey45") +
-  geom_violin(aes(y = prop_cycle,
+  geom_violin(aes(y = prop_cycle, # I counted the cycles separately in the data frame, so we will handle them separately as well
                   x = rank),
               col = "grey45") +
-  geom_rect(data = peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+  geom_rect(data = peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 & 
                                                       peaks_total_ranked_summarised$c == 0 &
                                                   peaks_total_ranked_summarised$scape_rep == 1 &
                                                    peaks_total_ranked_summarised$rank == 1 &
@@ -338,13 +276,13 @@ localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
             fill = "grey80", # putting a grey rectangle over the ranks that do not exist; for C = 0, there are only four possible fitness ranks per species
             alpha = 0.5,
             inherit.aes = FALSE) +
-  geom_jitter(col = "forestgreen",
+  geom_jitter(col = "forestgreen", # for equilibrium points
               size = 2.5,
               height = 0.01,
               alpha = 0.3) +
   geom_jitter(aes(y = prop_cycle,
                   x = rank),
-               col = "skyblue",
+               col = "skyblue", # for cycling points
               size = 2.5,
               height = 0.01,
               alpha = 0.3) +
@@ -381,9 +319,10 @@ localrep_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
                    sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
                                        breaks = NULL, labels = NULL)) +
   theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
   fig_theme
 
+# save the figure
 ggsave(path = "../Figures/",
        device = cairo_pdf, # to save pdf with unicode character
        units = c("cm"),
@@ -395,6 +334,7 @@ ggsave(path = "../Figures/",
 ```
 
 ## Fig 4c Repeatability N' = 4
+To have a refernce for comparison of the intergenomic epistasis results, we also assess adaptation on equivalent single-species landscape with N' = 4 and K' = K + C
 ```{r}
 localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
                                        peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
@@ -403,7 +343,7 @@ localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
             group = rank)) +
      theme_bw() +
   geom_violin(col = "grey45") +
-  geom_jitter(col = "forestgreen",
+  geom_jitter(col = "forestgreen", # here, I only have equilibrium outcomes
               size = 2.5,
               height = 0.01,
               alpha = 0.3) +
@@ -430,7 +370,7 @@ localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
         text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character
   fig_theme
 
-
+# save the figure
 ggsave(path = "../Figures/",
        device = cairo_pdf, # to save pdf with unicode
        units = c("cm"),
@@ -487,7 +427,7 @@ effectIM_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
               alpha = 0.5) +
   geom_jitter(aes(y = prop_cycle,
                   x = rank),
-               col = "skyblue",
+               col = "skyblue", # cycling points
               size = 2.5,
               height = 0.01,
               alpha = 0.5) +
@@ -536,7 +476,7 @@ effectIM_N2 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarise
         legend.position = "none",
         text = element_text(family = "Arial Unicode MS")) # font family to display the unicode character
 
-
+# save the figure
 ggsave(path = "../Figures/",
        device = cairo_pdf, # to save pdf with unicode
        units = c("cm"),
@@ -548,16 +488,18 @@ ggsave(path = "../Figures/",
 ```
 
 ## cycle investigation
+This is a little code insert to extract some meaningful properties of the cycles, such as mean fitness of the species during the cycle in order to integrate the cycle results with the equilibrium results
 ```{r}
+# For each combination of C = 1, 2 and K = 0, 1, I extract the cycles and extract the information I'm interested in
 # for N = 2, K = 0, C = 1
 cycles_nkc_201 <- NULL
 
 c_rep <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
-                     peaks_total$step == 250 & 
+                     peaks_total$step == 250 & # these are the simulations that were cut off at the number of maximum steps
                        peaks_total$walking == "random" &
-                       peaks_total$species == 1, "c_rep"]
+                       peaks_total$species == 1, "c_rep"] # I want to know how many interaction network replicates I have because this differs between C = 1 and C  = 2
 
-for (i in unique(c_rep)){ # IM replicates
+for (i in unique(c_rep)){ # for each interaction network replicate
   
   scape_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
                               peaks_total$c_rep == i &
@@ -565,7 +507,7 @@ for (i in unique(c_rep)){ # IM replicates
                        peaks_total$walking == "random" &
                        peaks_total$species == 1, "scape_rep"]
   
-  for (j in unique(scape_reps)) { # fitness landscape replicates
+  for (j in unique(scape_reps)) { # for each fitness landscape replicate
     
     walk_reps <- peaks_total[peaks_total$n == 2 & peaks_total$k == 0 & peaks_total$c == 1 & 
                               peaks_total$c_rep == i &
@@ -574,26 +516,27 @@ for (i in unique(c_rep)){ # IM replicates
                        peaks_total$walking == "random" &
                        peaks_total$species == 1, "walk_rep"]
     
-    for (l in unique(walk_reps)) {
+    for (l in unique(walk_reps)) { # for each adaptive walk
       
-      ranks_sp1 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp1 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"]) # check how many unique metagenotypes there are during the last 20 steps of the adaptive walk
       ranks_sp2 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
       
+      # extract my information
       summary_temp <- data.frame(n = 2,
                               k = 0,
                               c = 1,
                               c_rep = i,
                               scape_rep = j,
                               walk_rep = l,
-                              nb_in_cycle_sp1 = length(ranks_sp1), # should be 4?
-                              nb_in_cycle_sp2 = length(ranks_sp2), # should be 4?
-                              high_rank_sp1 = min(ranks_sp1),
+                              nb_in_cycle_sp1 = length(ranks_sp1), # length of cycle
+                              nb_in_cycle_sp2 = length(ranks_sp2), 
+                              high_rank_sp1 = min(ranks_sp1), # max fitness rank during cycle
                               high_rank_sp2 = min(ranks_sp2),
-                              low_rank_sp1 = max(ranks_sp1),
+                              low_rank_sp1 = max(ranks_sp1), # min fitness rank during cycle
                               low_rank_sp2 = max(ranks_sp2),
-                              var_rank_sp1 = var(ranks_sp1),
+                              var_rank_sp1 = var(ranks_sp1), # variation in fitness rank during cycle
                               var_rank_sp2 = var(ranks_sp2),
-                              mean_rank_sp1 = mean(ranks_sp1),
+                              mean_rank_sp1 = mean(ranks_sp1), # mean fitness rank during cycle
                               mean_rank_sp2 = mean(ranks_sp2),
                            landscape_ID = interaction(2, 0, 1, i, j))
       
@@ -605,6 +548,7 @@ for (i in unique(c_rep)){ # IM replicates
   
 }
 
+# repeat for all other combinations...
 # for N = 2, K = 1, C = 1
 cycles_nkc_211 <- NULL
 
@@ -641,8 +585,8 @@ for (i in unique(c_rep)){ # IM replicates
                               c_rep = i,
                               scape_rep = j,
                               walk_rep = l,
-                              nb_in_cycle_sp1 = length(ranks_sp1), # should be 4?
-                              nb_in_cycle_sp2 = length(ranks_sp2), # should be 4?
+                              nb_in_cycle_sp1 = length(ranks_sp1), 
+                              nb_in_cycle_sp2 = length(ranks_sp2), 
                               high_rank_sp1 = min(ranks_sp1),
                               high_rank_sp2 = min(ranks_sp2),
                               low_rank_sp1 = max(ranks_sp1),
@@ -773,10 +717,13 @@ for (i in unique(c_rep)){ # IM replicates
   
 }
 
+# combine the information of all individual cycles
 cycles_df <- rbind(cycles_nkc_201, cycles_nkc_211, cycles_nkc_212, cycles_nkc_202)
+
+# give the cycles IDs so I can group identical cycles together
 cycles_df$cycle_ID <- interaction(cycles_df[, c("high_rank_sp1", "high_rank_sp2", "low_rank_sp1", "low_rank_sp2")])
 
-# for if I want to look at unique cycles (it is possible to have multiple cycles)
+# for if I want to look at unique cycles (it is possible to have multiple cycles on a landscape)
 summary_cycles <-  NULL
 
 for (scape_ID in unique(cycles_df$landscape_ID)){
