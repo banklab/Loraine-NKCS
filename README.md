@@ -7,5 +7,5 @@ The NKCS model was originally introduced my Kauffman & Johnsen (1991)
 
 This folder contains the following R markdown files:
 ❣️ NKC(S).Rmd - the file that includes all the code to build the model (note that I've only tested it for fully symmetric 2-species communities)
-🔄 NKC_simulations - code to run the simulations
-📈 NKC_exploration - code for additional analysis and to generate plots
+🔄 NKC_simulations.Rmd - code to run the simulations
+📈 NKC_exploration.Rmd - code for additional analysis and to generate plots
