@@ -3,6 +3,8 @@ title: "NKC_exploration"
 output: html_notebook
 ---
 
+Loraine Hablützel - 01.04.2026
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -760,6 +762,7 @@ for (scape_ID in unique(cycles_df$landscape_ID)){
 ```
 
 ## Fig. 6 - fitness cost/interaction matrices C = 1
+This is the figure that shows how fitness load is distributed for species and how asymmetry in fitness load can arise due to specific genetic interactions (the intergenomic interaction networks)
 ```{r}
 df_cycles_sp1 <- data.frame(k = summary_cycles$k,
                               c = summary_cycles$c,
@@ -887,125 +890,6 @@ ggsave(path = "../Figures/",
        plot = IM_fitness_species)
 
 ```
-
-## fitness load - cycles vs. equilibrium + species vs community
-```{r}
-peaks_total_ranked_w_cycles$community <- "no"
-
-
-prop_peaks <- peaks_total_ranked_w_cycles %>%
-  group_by(n, k, c, cycle, rank, walking, community) %>%
-  summarise(count = sum(rank_peaked)) %>%
-  group_by(n, k, c, walking, community) %>%
-  mutate(tot = sum(count)) %>%
-  mutate(prop = count/tot)
-
-# community
-df_cycles_community <- data.frame(k = summary_cycles$k,
-                              c = summary_cycles$c,
-                              n = summary_cycles$n,
-                              a = rep(2, nrow(summary_cycles)),
-                              k_rep = rep(1, nrow(summary_cycles)),
-                              c_rep = summary_cycles$c_rep,
-                            scape_rep = rep(NA, nrow(summary_cycles)),
-                            rank_sp1 = round(summary_cycles$mean_rank_sp1, 0),
-                            rank_sp2 = round(summary_cycles$mean_rank_sp2, 0),
-                            community = rep("yes", nrow(summary_cycles)),
-                            rank_peaked = summary_cycles$appeared,
-                            landscape_ID = summary_cycles$scape_ID,
-                            corr_rank = rep(NA, nrow(summary_cycles)),
-                            cycle = rep("yes", nrow(summary_cycles)))
-
-community_ranked_w_cycles <- peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17, !names(peaks_total_ranked2_summarised) %in% c("species")]
-community_ranked_w_cycles$cycle <- "no"
-community_ranked_w_cycles$community <- "yes"
-community_ranked_w_cycles <- rbind(community_ranked_w_cycles, df_cycles_community)
-
-prop_community_cycle <- community_ranked_w_cycles %>%
-  group_by(n, k, c, rank_sp1, rank_sp2, community, cycle) %>%
-  summarise(count = sum(rank_peaked)) %>%
-  group_by(n, k, c, community) %>%
-  mutate(tot = sum(count)) %>%
-  mutate(prop = count/tot)
-
-fitness_species <- ggplot(prop_peaks[prop_peaks$n == 2 &
-                                       prop_peaks$c != 0 &
-                            prop_peaks$cycle == "no" &
-                          prop_peaks$walking == "random",],
-       aes(x = rank,
-           y = prop,
-           group = rank)) +
-  geom_col(data = prop_community_cycle[prop_community_cycle$n == 2 &
-                                         prop_community_cycle$cycle == "no" &
-                                         prop_community_cycle$c != 0,],
-           aes(x = (rank_sp1 + rank_sp2)/2-0.125,
-               group = (rank_sp1 + rank_sp2)/2,
-               y = -prop,
-               fill = interaction(community, cycle)),
-           width = 0.25) +
-  geom_col(data = prop_community_cycle[prop_community_cycle$n == 2 &
-                                         prop_community_cycle$cycle == "yes",],
-           aes(x = (rank_sp1 + rank_sp2)/2+0.125,
-               group = (rank_sp1 + rank_sp2)/2,
-               y = -prop,
-               fill = interaction(community, cycle)),
-           width = 0.25) +
-  geom_col(aes(group = cycle,
-               fill = interaction(community, cycle),
-               x = rank-0.125),
-           width = 0.25) + 
-  geom_col(data = prop_peaks[prop_peaks$n == 2 &
-                            prop_peaks$cycle == "yes" &
-                          prop_peaks$walking == "random",],
-           aes(group = cycle,
-               fill = interaction(community, cycle),
-               x = rank+0.125),
-           width = 0.25) + 
-  geom_hline(yintercept=0,
-             linewidth = 0.65,
-             col = "grey50") +
-     theme_bw() +
-  facet_grid(c ~ k) +
-  scale_fill_manual(values=c("forestgreen", "skyblue", "darkseagreen", "steelblue"),
-                    breaks = c("no.no", "no.yes", "yes.no", "yes.yes"),
-                    labels = c("Equilibrium", "Cycle", "Equilibrium", "Cycle")) +
-  scale_x_continuous(labels = c("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), 
-                     breaks = c(1:16),
-                     limits = c(0.5,16.5),
-                   name = "Fitness load (rank difference to global peak)",
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), breaks = NULL, labels = NULL)) +
-  scale_y_continuous(name = "Proportion of overall outcomes",
-                     limits = c(-0.3, 0.32),
-                     breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3),
-                     labels = c("0.3", "0.2", "0.1", "0.0", "0.1", "0.2", "0.3"),
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
-                                       breaks = NULL, labels = NULL)) +
-  theme(panel.grid.minor.x = element_blank(),
-        panel.grid.minor.y = element_blank(),
-        panel.grid.major.x = element_blank(),
-        axis.title.y.right = element_text(angle = 90, vjust = 0.5),
-        axis.title.y.left = element_markdown(),
-        axis.text.x.bottom = element_text(size=16),
-                        axis.text.y = element_text(size=15),
-                        axis.title = element_text(size=24),
-        strip.text.x = element_text(size = 15),
-                      strip.text.y = element_text(size = 15, angle = 0),
-        legend.text = element_text(size = 13),
-        legend.position = c(0.86,0.87),
-        legend.background = element_rect(fill = "transparent"),
-        legend.title = element_blank(),
-        text = element_text(family = "Arial Unicode MS")) 
-
-ggsave(path = "../Figures/",
-       device = cairo_pdf, # to save pdf with unicode character
-       units = c("cm"),
-       width = 26,
-       height = 15,
-       filename = "fitnessload.pdf",
-       plot = fitness_species)
-
-```
-
 
 ## Fig 7 - correlation-fitness relationship
 Next, we show how the correlation of fitness ranks between the species can reveal some trends on how lare the expected fitnes cost of a species is
@@ -1192,9 +1076,9 @@ for (i in 1:nrow(community_ranked_w_cycles)){
 
 # now, let's plot; since this type of figure is difficult to interpret we only show one of them in the main text and the rest can be found in the supplementary material
 
-# we combine three plots; (i) the results for N = 2, K = 0, C = 1, (ii) an empty plot; here I add our expectations and the categorisation of win/win, Lose/lose, win/lose and cycling in post using Adobe illustrator, and (iii) a distance plot to show the second important feater we observe - how the difference in fitness ranks depends on the fitness rank correlation
+# we combine four plots; (i) the results for N = 2, K = 0, C = 1, with an empty plot as an inset; here I add our expectations and the categorisation of win/win, Lose/lose, win/lose and cycling in post using Adobe illustrator, (ii) a distance plot to show how the difference in fitness ranks depends on the fitness rank correlation, and (iii) the mean community fitness load
 
-# first plot
+# first plot - "interaction results"
 eco_outcome <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank) &
                                                        peaks_total_ranked2_summarised$k == 0 &
                                                        peaks_total_ranked2_summarised$c == 1 &
@@ -1264,7 +1148,7 @@ eco_outcome <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_
         legend.background = element_rect(fill = "transparent"))
 
 
-# second plot
+# second plot - inset
 blank <- ggplot(community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
                                                        community_ranked_w_cycles$c == 1,],
        aes(x = corr_rank,
@@ -1297,46 +1181,24 @@ panel_a <- eco_outcome +
                                 ymax = 16.5)
 
 
-# third plot
-library(car)
+# third plot - difference in fitness ranks between the species
 
-model_diff <- glmmTMB::glmmTMB(abs(rank_sp1-rank_sp2) ~ corr_rank + (1 | landscape_ID) ,
-               data = community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
-                                                       community_ranked_w_cycles$c == 1,],
-               family = poisson,
-               weights = rank_peaked)
-
-
+# for this I fit a generalised linear mixed model
 model_diff3 <- glmmTMB::glmmTMB(abs(rank_sp1-rank_sp2) ~ corr_rank + c + k + cycle,
                data = community_ranked_w_cycles[community_ranked_w_cycles$c != 0,],
                family = poisson,
-               weights = rank_peaked)
-
-
-car::Anova(model_diff3)
-#anova(model_diff, model_diff2, model_diff3, model_diff4, model_diff_all, test = "Chisq")
-
-#effects_k0 <- effects::effect(term= "corr_rank", 
-#                              mod= model_diff_all,
-#                              xlevels = 50)
-#effects_k0_df <- as.data.frame(effects_k0)
-
-#create a new dataframe: names should match those of the originary dataframe
-#new_community_df = expand.grid(corr_rank = seq(-1,1,0.05),
-#                     c = c(1,2),
-#                     k = c(0,1),
-#                     cycle = c("yes", "no"))
+               weights = rank_peaked) # weighted by often the outcomes occur
 
 community_ranked_w_cycles_tst <- community_ranked_w_cycles[community_ranked_w_cycles$c != 0,]
  
-#add preditions
+#add predictions to plot trend lines
 community_ranked_w_cycles_tst$predict = predict(model_diff3, 
                                                 type = "response", 
                                                 newdata = community_ranked_w_cycles_tst)
 
 
 distance_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_tst$k == 0 &
-                                                       community_ranked_w_cycles_tst$c == 1,],
+                                                       community_ranked_w_cycles_tst$c == 1,], # I want to only show C = 0 as an example
        aes(x = corr_rank,
            y = abs(rank_sp1-rank_sp2))) +
   geom_hline(yintercept = 0,
@@ -1346,7 +1208,7 @@ distance_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_
              size = 2.5) +
   geom_line(aes(x = corr_rank, 
                 y = predict,
-                col = interaction(cycle, n)),
+                col = interaction(cycle, n)), # doing this to get the colour mapping the way I want :-)
             linewidth = 1.5) +
   scale_colour_manual(values=c("forestgreen", "skyblue", "darkgreen","turquoise3"),
                     breaks = c("no", "yes", "no.2", "yes.2")) +
@@ -1369,13 +1231,9 @@ distance_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_
         panel.grid.major.y = element_blank(),
         axis.title.y.right = element_text(angle = 0, vjust = 0.5)) 
 
-# fourth plot
-model_mean <- glmmTMB::glmmTMB((rank_sp1+rank_sp2)/2 ~ corr_rank + (1 | landscape_ID) ,
-               data = community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
-                                                       community_ranked_w_cycles$c == 1,],
-               family = poisson,
-               weights = rank_peaked)
+# fourth plot - community fitness load
 
+# I fit another glmm for this using the same formula as above
 model_mean3 <- glmmTMB::glmmTMB((rank_sp1+rank_sp2)/2 ~ corr_rank + c + k + cycle,
                data = community_ranked_w_cycles[community_ranked_w_cycles$c != 0,],
                family = poisson,
@@ -1385,11 +1243,6 @@ community_ranked_w_cycles_tst$predict_mean = predict(model_mean3,
                                                 type = "response", 
                                                 newdata = community_ranked_w_cycles_tst)
 
-
-#effects_k0_mean <- effects::effect(term= "corr_rank", 
-#                              mod= model_mean,
-#                              xlevels = 50)
-#effects_k0_mean_df <- as.data.frame(effects_k0_mean)
 
 mean_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_tst$k == 0 &
                                                        community_ranked_w_cycles_tst$c == 1,],
@@ -1442,7 +1295,7 @@ ggsave(path = "../Figures/",
 ```
 
 
-# 3.) Supplementary figures
+# 3.) Supplementary figures 
 ## fitness distribution -random
 Here we show which fitness outcomes are the most common, which gives us the expected fitness distribution for each combination of K and C; this figure also shows the cycling probability
 ```{r}
@@ -1503,6 +1356,126 @@ ggsave(path = "../Figures/",
        plot = fitness_dis_N2)
 
 ```
+
+## fitness load - cycles vs. equilibrium + species vs community
+Another way to visualise fitness load at the species and the community level
+```{r}
+peaks_total_ranked_w_cycles$community <- "no"
+
+
+prop_peaks <- peaks_total_ranked_w_cycles %>%
+  group_by(n, k, c, cycle, rank, walking, community) %>%
+  summarise(count = sum(rank_peaked)) %>%
+  group_by(n, k, c, walking, community) %>%
+  mutate(tot = sum(count)) %>%
+  mutate(prop = count/tot)
+
+# community
+df_cycles_community <- data.frame(k = summary_cycles$k,
+                              c = summary_cycles$c,
+                              n = summary_cycles$n,
+                              a = rep(2, nrow(summary_cycles)),
+                              k_rep = rep(1, nrow(summary_cycles)),
+                              c_rep = summary_cycles$c_rep,
+                            scape_rep = rep(NA, nrow(summary_cycles)),
+                            rank_sp1 = round(summary_cycles$mean_rank_sp1, 0),
+                            rank_sp2 = round(summary_cycles$mean_rank_sp2, 0),
+                            community = rep("yes", nrow(summary_cycles)),
+                            rank_peaked = summary_cycles$appeared,
+                            landscape_ID = summary_cycles$scape_ID,
+                            corr_rank = rep(NA, nrow(summary_cycles)),
+                            cycle = rep("yes", nrow(summary_cycles)))
+
+community_ranked_w_cycles <- peaks_total_ranked2_summarised[peaks_total_ranked2_summarised$rank_sp1 != 17, !names(peaks_total_ranked2_summarised) %in% c("species")]
+community_ranked_w_cycles$cycle <- "no"
+community_ranked_w_cycles$community <- "yes"
+community_ranked_w_cycles <- rbind(community_ranked_w_cycles, df_cycles_community)
+
+prop_community_cycle <- community_ranked_w_cycles %>%
+  group_by(n, k, c, rank_sp1, rank_sp2, community, cycle) %>%
+  summarise(count = sum(rank_peaked)) %>%
+  group_by(n, k, c, community) %>%
+  mutate(tot = sum(count)) %>%
+  mutate(prop = count/tot)
+
+fitness_species <- ggplot(prop_peaks[prop_peaks$n == 2 &
+                                       prop_peaks$c != 0 &
+                            prop_peaks$cycle == "no" &
+                          prop_peaks$walking == "random",],
+       aes(x = rank,
+           y = prop,
+           group = rank)) +
+  geom_col(data = prop_community_cycle[prop_community_cycle$n == 2 &
+                                         prop_community_cycle$cycle == "no" &
+                                         prop_community_cycle$c != 0,],
+           aes(x = (rank_sp1 + rank_sp2)/2-0.125,
+               group = (rank_sp1 + rank_sp2)/2,
+               y = -prop,
+               fill = interaction(community, cycle)),
+           width = 0.25) +
+  geom_col(data = prop_community_cycle[prop_community_cycle$n == 2 &
+                                         prop_community_cycle$cycle == "yes",],
+           aes(x = (rank_sp1 + rank_sp2)/2+0.125,
+               group = (rank_sp1 + rank_sp2)/2,
+               y = -prop,
+               fill = interaction(community, cycle)),
+           width = 0.25) +
+  geom_col(aes(group = cycle,
+               fill = interaction(community, cycle),
+               x = rank-0.125),
+           width = 0.25) + 
+  geom_col(data = prop_peaks[prop_peaks$n == 2 &
+                            prop_peaks$cycle == "yes" &
+                          prop_peaks$walking == "random",],
+           aes(group = cycle,
+               fill = interaction(community, cycle),
+               x = rank+0.125),
+           width = 0.25) + 
+  geom_hline(yintercept=0,
+             linewidth = 0.65,
+             col = "grey50") +
+     theme_bw() +
+  facet_grid(c ~ k) +
+  scale_fill_manual(values=c("forestgreen", "skyblue", "darkseagreen", "steelblue"),
+                    breaks = c("no.no", "no.yes", "yes.no", "yes.yes"),
+                    labels = c("Equilibrium", "Cycle", "Equilibrium", "Cycle")) +
+  scale_x_continuous(labels = c("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), 
+                     breaks = c(1:16),
+                     limits = c(0.5,16.5),
+                   name = "Fitness load (rank difference to global peak)",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of overall outcomes",
+                     limits = c(-0.3, 0.32),
+                     breaks = c(-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3),
+                     labels = c("0.3", "0.2", "0.1", "0.0", "0.1", "0.2", "0.3"),
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        axis.title.y.left = element_markdown(),
+        axis.text.x.bottom = element_text(size=16),
+                        axis.text.y = element_text(size=15),
+                        axis.title = element_text(size=24),
+        strip.text.x = element_text(size = 15),
+                      strip.text.y = element_text(size = 15, angle = 0),
+        legend.text = element_text(size = 13),
+        legend.position = c(0.86,0.87),
+        legend.background = element_rect(fill = "transparent"),
+        legend.title = element_blank(),
+        text = element_text(family = "Arial Unicode MS")) 
+
+ggsave(path = "../Figures/",
+       device = cairo_pdf, # to save pdf with unicode character
+       units = c("cm"),
+       width = 26,
+       height = 15,
+       filename = "fitnessload.pdf",
+       plot = fitness_species)
+
+```
+
 
 ## N = 4 fitness distribution
 ```{r}
@@ -3081,6 +3054,8 @@ ggsave(path = "../Figures/",
 
 
 # 4.) Additional figures
+These are all the figures that did not make it into the final manuscript but might be interesting to brows/use in the future
+
 ## Fitness landscape example; "classic" version
 ```{r}
 example_scape_fig <- visualise_system(peaks_nkcs_2011[[4]][[1]][[13]], # I recode the alleles into as and bs in Adobe Illustrator O:-)
@@ -3401,7 +3376,7 @@ ggsave(path = "../Figures/",
 ```
 
 
-# cycle summary stats
+## cycle summary stats
 ```{r}
 
 # steps in adaptive walk

@@ -3,6 +3,7 @@ title: "NKC_exploration"
 output: html_notebook
 ---
 
+Loraine Hablützel - 01.04.2026
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -22,7 +23,7 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 
 ```
 
-# 1) Let's let it rip!!
+# 1) Let's run the simulations!
 ## 1.1) defining parameters
 ```{r parameters}
 set.seed(2512) # for reproducibility
