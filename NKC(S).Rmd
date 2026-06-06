@@ -14,10 +14,8 @@ knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_sc
 ### Set up workspace
 ```{r libraries}
 
-library(ggplot2) # for plotting
 library(gtools) # permutations to get all possible genotype combinations
 library(dplyr) # for constructing the data sets
-library(gghalves) # for plotting mixed boxplots with points
 
 ```
 
@@ -640,8 +638,8 @@ build_landscape <- function(IM_k, # intragenomic epistasis matrices
     
     # store as data frame for ease of proceeding
     genotype_table_species[[i]] <- as.data.frame(genotype_table_species[[i]])
+    colnames(genotype_table_species[[i]])[(n+1):(n+(s*n))] <- paste0("P.", 1:(s*n)) # loci of partner species ("P"); if s = 0, this will be overwritten in next steps
     colnames(genotype_table_species[[i]])[1:n] <- paste0("F.", 1:n) # loci of focal species ("F")
-    colnames(genotype_table_species[[i]])[(n+1):(n+(s*n))] <- paste0("P.", 1:(s*n)) # loci of partner species ("P")
     colnames(genotype_table_species[[i]])[(n+(s*n)+1):(2*n+(s*n))] <- paste0("h.", 1:n) # fitness contributions of each locus
     colnames(genotype_table_species[[i]])[2*n+(s*n)+1] <- "fitness"
     
@@ -671,13 +669,13 @@ findNeighbours <- function(landscape,
   
   differences <- c(rep(0, length(landscape[,1]))) # vector with entries for each genotype to keep track of difference to reference
     
-  for (i in 1:nb_loci){
+  for (loc in 1:nb_loci){
     
-    for (j in 1:length(landscape[,1])){
+    for (geno in 1:length(landscape[,1])){
       
-      if (landscape[j,i] != temp_genotype[i]){ # if both genotypes don't carry the same allele...
+      if (landscape[geno,loc] != temp_genotype[loc]){ # if both genotypes don't carry the same allele...
         
-        differences[j] <- differences[j] + 1 # ... I mark a difference in my vector
+        differences[geno] <- differences[geno] + 1 # ... I mark a difference in my vector
         
       }
       
@@ -785,6 +783,7 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
                           s_tot, # total number of species in the system
                           IM_c,
                           R, # "rounds of mutation to introduce asymmetry between species
+                          lambda_R, # if R = NA -> lambda of Poisson distribution
                           start = c("WT", "R", "S"), # choosing starting genotype
                           desired_start, # if I want to start at a specific genotype (start = "S")
                           max_steps=100) # max. number of steps on the landscape before I interrupt
@@ -841,7 +840,12 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
       temp_seq <- NA # here I will store the sequence for each species; this will be updated as the positions of loci in the sequence will change for each species (focal species always at the start of the sequence)
 
       temp_seq[1:n] <- specific_seq[(1+(i-1)*n):(n+(i-1)*n)] # these are the allelic values for the loci in the focal species
-      temp_seq[(n+1):(n+n*s)] <- specific_seq[-c((1+(i-1)*n):(n+(i-1)*n))] # these are the allelic values for the loci in the interacting species
+      
+      if(s !=0){
+       
+        temp_seq[(n+1):(n+n*s)] <- specific_seq[-c((1+(i-1)*n):(n+(i-1)*n))] # these are the allelic values for the loci in the interacting species 
+        
+      }
 
       walks[[i]] <- landscape_df[[i]][rowSums(mapply(`==`, landscape_df[[i]][, 1:(n+n*s)], temp_seq)) == n+n*s,] # this will give us the starting point of the adaptive walk; I'm matching the entry in the genotype table to the desired sequence
       walks[[i]]$step <- 0 # to signalise that this is the initial genotype
@@ -857,8 +861,21 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
   # count steps
   step <- 1
   
+  # if R = NA
+  if(is.na(R)){
+    
+    repeat_steps <- rpois(1, lambda = lambda_R)
+    
+  } 
+  
+  if(!is.na(R)) {
+    
+    repeat_steps <- R
+    
+  }
+  
   # repeat adaptive steps until a local maximum or the maximum allowed number of steps are reached
-  repeat { for (i in c(rep(1, R),2)){ # allow species 1 more rounds of mutation
+  repeat { for (sp in c(rep(1, repeat_steps),2)){ # allow species 1 more rounds of mutation
     # find neighbours and choose those with higher fitness
     # need to determine how many there are; 
     # - if 0, end simulation?; 
@@ -866,54 +883,66 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
     # - if >1, do true adaptive walk depending on method of choice
     
       # find neighbours one step away
-    neighbours <- findNeighbours(landscape_df[[i]], current_genotypes[[i]]$ID, n)
+    neighbours <- findNeighbours(landscape_df[[sp]], current_genotypes[[sp]]$ID, n)
     
     # but now I only want those neighbours that are accessible through mutation within a genome
-    true_neighbours <- neighbours[which(rowSums(mapply(`==`, neighbours[, (n+1):(n+s*n)], current_genotypes[[i]][, c((n+1):(n+s*n))])) == n*s),] # checking each allelic value at loci of interacting species against reference ("current genotype") and only accept, if all column match
+    true_neighbours <- neighbours[which(rowSums(mapply(`==`, neighbours[, (n+1):(n+s*n)], current_genotypes[[sp]][, c((n+1):(n+s*n))])) == n*s),] # checking each allelic value at loci of interacting species against reference ("current genotype") and only accept, if all columns match
+    
+    if(s == 0){ # if there is no interaction, all neighbours are true neighbours
+      
+      true_neighbours <- neighbours
+      
+    }
     
     # filter those with higher or equal fitness than the current genotype
-    neighbours_fitter <- true_neighbours[which(true_neighbours[, 2*n+(s*n)+1] >= current_genotypes[[i]][, 2*n+(s*n)+1]),]
+    neighbours_fitter <- true_neighbours[which(true_neighbours[, 2*n+(s*n)+1] >= current_genotypes[[sp]][, 2*n+(s*n)+1]),]
     
     new_genotypes <- list()
     
     # first option - already at peak; then stay
     if (nrow(neighbours_fitter) == 0) {
       
-      new_genotypes[[i]] <- current_genotypes[[i]][, c(1:(2*n+n*s+3))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
+      new_genotypes[[sp]] <- current_genotypes[[sp]][, c(1:(2*n+n*s+3))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
       
       # or there is only one high-fitness neighbor - go there directly
     } else if (nrow(neighbours_fitter) == 1) {
       
-      new_genotypes[[i]] <- neighbours_fitter
+      new_genotypes[[sp]] <- neighbours_fitter
       
       # or there are several high-fitness neighbors, choose fittest neighbour
     } else if (walk == "greedy"){
       
-      new_genotypes[[i]] <- neighbours_fitter[which(neighbours_fitter[, 2*n+(s*n)+1] == max(neighbours_fitter[,2*n+(s*n)+1])),]
+      new_genotypes[[sp]] <- neighbours_fitter[which(neighbours_fitter[, 2*n+(s*n)+1] == max(neighbours_fitter[,2*n+(s*n)+1])),]
       
       # choose random neighbour
     } else if (walk == "random"){
       
-      new_genotypes[[i]] <- neighbours_fitter[sample(1:nrow(neighbours_fitter), 1),]
+      new_genotypes[[sp]] <- neighbours_fitter[sample(1:nrow(neighbours_fitter), 1),]
       
       # or choose neighbour with certain probability weighted by how much more fit they are                                  
     } else if (walk == "prop"){
       
-      new_genotypes[[i]] <- neighbours_fitter[sample(1:nrow(neighbours_fitter), 1,
-                                       prob=(mapply('-', neighbours_fitter[, 2*n+(s*n)+1], current_genotypes[[i]][2*n+(s*n)+1]))/abs(sum(mapply('-', neighbours_fitter[, 2*n+(s*n)+1], current_genotypes[[i]][2*n+(s*n)+1])))),]
+      new_genotypes[[sp]] <- neighbours_fitter[sample(1:nrow(neighbours_fitter), 1,
+                                       prob=(mapply('-', neighbours_fitter[, 2*n+(s*n)+1], current_genotypes[[sp]][2*n+(s*n)+1]))/abs(sum(mapply('-', neighbours_fitter[, 2*n+(s*n)+1], current_genotypes[[sp]][2*n+(s*n)+1])))),]
     }
     
     # save step on landscape in my table to track the walk
-    walks[[i]] <- rbind(walks[[i]], cbind(new_genotypes[[i]], step, focal = i))
+    walks[[sp]] <- rbind(walks[[sp]], cbind(new_genotypes[[sp]], step, focal = sp))
     
     # after every step, update fitness of the other species since that might have changed due to intergenomic epistasis
-    for (j in c(1:s_tot)[-i]){
+    for (j in c(1:s_tot)[-sp]){
       
-      # update genotype
-      new_genotypes[[j]] <- landscape_df[[j]][which(rowSums(mapply(`==`, landscape_df[[j]][, 1:n], current_genotypes[[j]][, 1:n])) == ncol(landscape_df[[j]][, 1:n]) & rowSums(mapply(`==`, landscape_df[[j]][, (n+1):(n+s*n)], new_genotypes[[i]][, 1:n])) == ncol(landscape_df[[j]][, (n+1):(n+s*n)])),] # the loci of the focal genome are keeping the same allelic values as before, but the rest are updated in case there was a mutation in one of the other species - right now this only works with s = 1... but too lazy to implement variable s here rn soz
+      # update (meta)genotype
+      new_genotypes[[j]] <- landscape_df[[j]][which(rowSums(mapply(`==`, landscape_df[[j]][, 1:n], current_genotypes[[j]][, 1:n])) == ncol(landscape_df[[j]][, 1:n]) & rowSums(mapply(`==`, landscape_df[[j]][, (n+1):(n+s*n)], new_genotypes[[sp]][, 1:n])) == ncol(landscape_df[[j]][, (n+1):(n+s*n)])),] # the loci of the focal genome are keeping the same allelic values as before, but the rest are updated in case there was a mutation in one of the other species
+      
+      if(s == 0){
+        
+        new_genotypes[[j]] <- current_genotypes[[j]][, 1:(2*n+3)] # no need to change anything if there is no interaction
+        
+      }
       
       # store movement on landscape (or lack thereof I guess lol)
-      walks[[j]] <- rbind(walks[[j]], cbind(new_genotypes[[j]], step, focal = i))
+      walks[[j]] <- rbind(walks[[j]], cbind(new_genotypes[[j]], step, focal = sp ))
       
     }
     
@@ -927,12 +956,12 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
     # will take at least three steps to compare current fitness to two different time points in the past 
     if (step > 3){
     
-    for (i in 1:s_tot){
+    for (sp in 1:s_tot){
       
       # comparing fitness between now and last step as well as comparing fitness with now and two steps ago
-      if (walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-1, 2*n+(s*n)+1] &
-          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-2, 2*n+(s*n)+1] &
-          walks[[i]][nrow(walks[[i]]), 2*n+(s*n)+1] == walks[[i]][nrow(walks[[i]])-3, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself; for now two steps back works because of s_tot = 2; if I introduce larger asymmetries with R this also needs to be updated...
+      if (walks[[sp]][nrow(walks[[sp]]), 2*n+(s*n)+1] == walks[[sp]][nrow(walks[[sp]])-1, 2*n+(s*n)+1] &
+          walks[[sp]][nrow(walks[[sp]]), 2*n+(s*n)+1] == walks[[sp]][nrow(walks[[sp]])-2, 2*n+(s*n)+1] &
+          walks[[sp]][nrow(walks[[sp]]), 2*n+(s*n)+1] == walks[[sp]][nrow(walks[[sp]])-3, 2*n+(s*n)+1]) { # hmmm, if I have more species, maybe I'll have to check if fitness changed since the focal species was last allowed to mutate itself; for now two steps back works because of s_tot = 2; if I introduce larger asymmetries with R this also needs to be updated?
         
         stop_test <- c(stop_test, 1)
         
@@ -951,6 +980,13 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
    
     # stop after a number of steps if no optimum was reached (usually only an issue if there is cycling)
     if (step > max_steps) { break } 
+    
+    # if R = NA; redraw repeat_steps
+  if(is.na(R)){
+    
+    repeat_steps <- rpois(1, lambda = lambda_R)
+    
+  }
      
   }
   
@@ -1066,13 +1102,14 @@ assess_peaks_R <- function(n, # nb. of loci
                          c, # nb. of loci interacting between genomes (intergenomic epistasis)
                          s, # nb. of species interacting
                          R, # number of mutation rounds for sp 1
+                         lambda_R, # if R = NA -> lambda of Poisson distribution
                          s_tot, # total nb. of species in system
                          IM_ks, # list of intragenomic epistasis interaction matrices
                          IM_cs, # list of intergenomic epistasis interaction matrices
                          scape_reps, # nb. of replicates to generate fitness landscapes for each combination of IM_k and IM_c
                          fitness_contrib, # how fitness contributions are drawn 
                          fitness_calculation, # how fitness is calculated for genotypes
-                         fit_mean, # mean of fintess distribution when drawing from a normal distribution, or min fitness when drawing from a uniform distribution
+                         fit_mean, # mean of fitness distribution when drawing from a normal distribution, or min fitness when drawing from a uniform distribution
                          fit_sd, # sd of fitness distribution when drawing from a normal distribution, or max fitness when drawing from a uniform distribution
                          walk_reps, # nb. of replicates of adaptive walks on a given landscape
                          walk_type, # vector of types of adaptive walks (random, greedy, prop)
@@ -1092,22 +1129,25 @@ total_walks <- list()
 scapes_replicated <- list() # to store the landscapes
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
-total_walks[[IM_c_reps]] <- list()
+total_walks[[IM_k_reps]] <- list()
+total_walks[[IM_k_reps]][[IM_c_reps]] <- list()
 
 for (k_rep in 1:IM_k_reps) {
   
   IM_k <- IM_ks[[k_rep]]
   
+  scapes_replicated[[k_rep]] <- list()
+  
   for (c_rep in 1:IM_c_reps){
     
     IM_c <- IM_cs[[c_rep]]
     
-    scapes_replicated[[c_rep]] <- list() # I want to save the landscapes for each combination of k and c matrix (only C is variable for now)
+    scapes_replicated[[k_rep]][[c_rep]] <- list() # I want to save the landscapes for each combination of k and c matrix
   
     # create the landscapes
   for (scape_rep in 1:scape_reps) {
     
-    scapes_replicated[[c_rep]][[scape_rep]] <- build_landscape(IM_k,
+    scapes_replicated[[k_rep]][[c_rep]][[scape_rep]] <- build_landscape(IM_k,
                              IM_c, 
                 fitness_contrib,
                 fitness_calculation,
@@ -1125,12 +1165,12 @@ for (k_rep in 1:IM_k_reps) {
     
     for (global_peak in 1:s_tot){
       
-      global_peaks[[global_peak]] <-  max(scapes_replicated[[c_rep]][[scape_rep]][[global_peak]][,2*n+s*n+1])
+      global_peaks[[global_peak]] <-  max(scapes_replicated[[k_rep]][[c_rep]][[scape_rep]][[global_peak]][,2*n+s*n+1])
       
     }
     
     # for each landscape perform the adaptive walks
-    total_walks[[c_rep]][[scape_rep]] <- list()
+    total_walks[[k_rep]][[c_rep]][[scape_rep]] <- list()
     
     for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
 
@@ -1143,9 +1183,9 @@ for (k_rep in 1:IM_k_reps) {
         
         desired_start <- start_seqs[[walk_rep %% length(start_seqs) + 1]]
           
-        }
+      }
       
-      walks_replicated[[walk_rep]] <- adaptive_walk_R(scapes_replicated[[c_rep]][[scape_rep]], 
+      walks_replicated[[walk_rep]] <- adaptive_walk_R(scapes_replicated[[k_rep]][[c_rep]][[scape_rep]], 
               walk = walking,
               n,
               c,
@@ -1153,6 +1193,7 @@ for (k_rep in 1:IM_k_reps) {
               s_tot, 
               IM_c,
               R,
+              lambda_R,
               start = walk_start,
               desired_start,
               max_steps)
@@ -1182,7 +1223,7 @@ for (k_rep in 1:IM_k_reps) {
       
     }
     
-    total_walks[[c_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
+    total_walks[[k_rep]][[c_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
     
     }
   
@@ -1207,6 +1248,7 @@ assess_peaks_R_input <- function(n, # nb. of loci
                          c, # nb. of loci interacting between genomes (intergenomic epistasis)
                          s, # nb. of species interacting
                          R, # number of mutation rounds for sp 1
+                         lambda_R, # if R = NA -> lambda of Poisson distribution
                          s_tot, # total nb. of species in system
                          IM_ks, # list of intragenomic epistasis interaction matrices
                          IM_cs, # list of intergenomic epistasis interaction matrices
@@ -1230,7 +1272,8 @@ total_walks <- list()
 scapes_replicated <- landscapes
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
-total_walks[[IM_c_reps]] <- list()
+total_walks[[IM_k_reps]] <- list()
+total_walks[[IM_k_reps]][[IM_c_reps]] <- list()
 
 for (k_rep in 1:IM_k_reps) {
   
@@ -1244,12 +1287,12 @@ for (k_rep in 1:IM_k_reps) {
     
     for (global_peak in 1:s_tot){
       
-      global_peaks[[global_peak]] <-  max(scapes_replicated[[c_rep]][[scape_rep]][[global_peak]][,2*n+s*n+1])
+      global_peaks[[global_peak]] <-  max(scapes_replicated[[k_rep]][[c_rep]][[scape_rep]][[global_peak]][,2*n+s*n+1])
       
     }
     
     # for each landscape perform the adaptive walks
-    total_walks[[c_rep]][[scape_rep]] <- list()
+    total_walks[[k_rep]][[c_rep]][[scape_rep]] <- list()
     
     for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
 
@@ -1264,7 +1307,7 @@ for (k_rep in 1:IM_k_reps) {
           
         }
       
-      walks_replicated[[walk_rep]] <- adaptive_walk_R(scapes_replicated[[c_rep]][[scape_rep]], 
+      walks_replicated[[walk_rep]] <- adaptive_walk_R(scapes_replicated[[k_rep]][[c_rep]][[scape_rep]], 
               walk = walking,
               n,
               c,
@@ -1301,7 +1344,7 @@ for (k_rep in 1:IM_k_reps) {
       
     }
     
-    total_walks[[c_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
+    total_walks[[k_rep]][[c_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
     
     }
   
