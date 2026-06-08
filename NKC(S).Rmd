@@ -19,7 +19,7 @@ library(dplyr) # for constructing the data sets
 
 ```
 
-### The NKC(S) model
+### A) The NKC(S) model
 code for NK model based on explanations from Welch & Waxman (2005) and supported by python code from Maciej Workiewicz (https://github.com/Mac13kW/NK_model)
 the NK model was introduced by Kauffman & Weinberger (1989) and the NKC(S) model was introduced by Kauffman & Johnson (1991)
 
@@ -29,7 +29,7 @@ a = nb. of possible alleles per locus
 k = nb. of loci that epistatically influence a given focal locus; k <= n-1
 s = nb. of species that are linked through intergenomic epistasis
 s_tot = total nb. of species in the system
-c = nb. of loci in each of s species epistatically influencing a given focal locus
+c = nb. of loci in each of s species epistatically influencing a given focal locus; c <= n
 W = fitness
 h = fitness contributions of each locus
 IM = interaction matrix; determines how the loci are linked epistatically
@@ -46,7 +46,7 @@ any locus can be influenced by any locus - interactions are not necessarily reci
 ```{r random interaction matrix}
 IM_random <- function(n, k){
   
-  if (n == 2 & k == 1){
+  if (k == (n-1)){ # fully epistatic
     
     IM_random <- matrix(n, n, data = rep(1, n^2))
     
@@ -768,7 +768,7 @@ visual_landscape <- function(landscape, n, c, s) {
 }
 ```
 
-# 5) Adaptive walks
+## 5) Adaptive walks
 three possible ways:
 - greedy walk   -> move to the neighbour with the highest fitness
 - random fitter -> move to a random neighbour with higher fitness
@@ -997,7 +997,7 @@ adaptive_walk_R <- function(landscape, # landscape(s) on which to perform walk(s
 ```
 
 
-# 6) Visualise the system (coupled landscapes and walks)
+## 6) Visualise the system (coupled landscapes and walks)
 ```{r visualise systems and adaptive walks}
 
 visualise_system <- function(landscapes,
@@ -1094,7 +1094,7 @@ visualise_walks <- function(adaptive_walks,
 
 ```
 
-# 7) Replicate the adaptive walks
+## 7) Replicate the adaptive walks
 ````{r replicates}
 assess_peaks_R <- function(n, # nb. of loci
                          k, # nb. of loci interacting within genome (intragenomic epistasis)
@@ -1365,8 +1365,7 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 
 ````
 
-
-# XX) test runs
+# 8) test runs
 ```{r test landscape}
 
 # set.seed(1313)
@@ -1425,5 +1424,334 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 #                 s_tot,
 #                 testscape)
 
+```
+
+
+### B) NKsea model (NK seascapes)
+In order to have a comparison for multidimensional fitness mappings and have an abiotic equivalent to dynamic environments created by the species interactions, we implement a seascapes equivalent repurposing the NKC functions 
+
+Let's imagine we create a s*n seascape equivalent to the NKC model, to start off we can imagine that n loci ar relevant for each abiotic environment (essentially each of s_tot species is trandslated into a different abiotic environment). We can reinterpret the K from the NKC model as genetic interactions between loci relevant for a given abiotic environment and C as genetic interactions between loci relevant for different abiotic environments. Additionally, we can toggle the pleiotropy in the system by changing the number of loci that contribute to environment-specific fitness
+
+## 1) Variable explanations
+n = baseline nb. of haploid loci contributing to environment-specific fitness
+a = nb. of possible alleles per locus
+k = nb. of interactions between loci encoding for the same environment-specific fitness; k <= n+p-1
+env = nb. of environments a species experiences
+env_tot = total nb. of abiotic environments in the system
+k_e = nb. of interactions between loci encoding for different environment-specific fitness; k_e <= n-p (equivalent to c)
+p = nb. of haploid loci contributing to multiple environment-specific fitnesses (= pleiotropic loci)
+W_e = environment-specific fitness
+h = fitness contributions of each locus
+IM = interaction matrix; determines how the loci are linked epistatically
+
+(again, we will assume full symmetry between environments)
+
+
+## 2) Creating the landscapes
+# 2.1) Generate seascapes
+```{r NK seascapes}
+build_seascape <- function(IM_sea, # seascape intercation matrix
+                            fitness_contrib = c("N", "U"), # way to draw fitness contributions (normal vs. uniform distribution)
+                            fitness_calculation = c("KJ", "WW"), # way to calculate fitness (according to Kauffman & Johnson or Welch & Waxman) 
+                            n, # nb of loci contributing to an environment
+                            k, # nb of interacting loci within an environment
+                           k_e, # nb of interacting loci between environments
+                            a, # nb of alleles per locus
+                            env_tot, # total nb. of abiotic environments in the system
+                           p, # pleiotropic loci - not implemented yet
+                            fit_mean, # mean of fintess distribution when drawing from a normal distribution, or min fitness when drawing from a uniform distribution
+                            fit_sd) # sd of fintess distribution when drawing from a normal distribution, or max fitness when drawing from a uniform distribution
+  {
+  
+  env <- env_tot-1
+
+  # how to generate allelic values? (normal distribution vs uniform distribution)
+  if (fitness_contrib == "N"){# for drawing from a normal distribution
+    
+    alleles_generate <- generate_alleles
+    
+  } else if (fitness_contrib == "U") {
+    
+    alleles_generate <- generate_alleles_unif
+    
+  }
+  
+  # how to calculate fitness?
+  if (fitness_calculation == "KJ"){
+    
+    fitness_calculate <- fitness_calc 
+    
+  } else if (fitness_calculation == "WW"){
+    
+    fitness_calculate <- fitness_calc_mult 
+    
+  }
+  
+  # generate all possible genotypes 
+  genotypes <- generate_genotypes(a,env_tot*n)
+  
+  # generate all possible fitness contributions depending on k and k_e epistatic interactions
+  h_table_env <- list() # a list with all look up tables for each of the env_tot environments; each list item is a look-up table of dimension n*env_tot x a^(k+1+k_e*env) for all possible allelic values
+  
+  # for each species:
+  for (i in 1:env_tot){
+    
+    # generate look-up table with all possible allelic values (dependent on k+1+k_e*env loci within and between species); dimension n x a^(k+1+k_e*env) for all possible allelic values; here is where the pleiotropy would come in -> (n+p) x a^(...)
+    # each column = 1 locus, each row = different genetic background
+    h_table_env[[i]] <- alleles_generate(n+p, k, a, k_e, env, fit_mean, fit_sd) # I reuse the NKC function and sub out k_e for c
+    
+  }
+  
+  # now that we generated all the fitness contributions and know all the genetic interactions in the system
+  
+  # keeping track of all genotypes, their fitness contributions and total calculated fitness
+  genotype_table_env <- list()
+  
+  # for each environment:
+  for (i in 1:env_tot){
+    
+    # table to keep track of all fitness vectors
+    fitnesses <- NULL
+    
+    # for each genotype (remember, the genotype encoding is the same in all environments; it's just the fitness values and epistatic interactions that differ)
+    for (j in 1:nrow(genotypes)){
+      
+      # keep track of fitness contribution at each locus (h)
+      h_vector <- NULL # vector of fitness contributions per locus for each genotype
+      
+      # for each genotype we look up the fitness contribution (h) at each locus; h depends on k+1+k_e*env loci 
+      # for each locus:
+      for (l in (1+n*(i-1)):(n+n*(i-1))) { # skipping the placeholder "k" to iterate over, since k is used as a variable in the model; this would have to be adjusted for p != 0
+        
+        # which loci determine the fitness contribution at this locus?
+        interesting_loci <- which(IM_sea[l, ] != 0) # based on the seascape interaction matrix
+
+        # what are the alleles present at the loci we're interested in for this given genotype?
+        alleles <- genotypes[j, interesting_loci]
+        
+        # let's access the fitness contributions associated with the genetic background
+        index <- 1
+      
+        # for all loci contributing to h:
+        for (m in 1:length(alleles)) {
+        
+        index <- index + (a^((k+1+(env*k_e))-m))*(alleles[m]-1)
+        
+        }
+      
+        # store the fitness contributions in a vector
+        
+        
+        h_vector <- cbind(h_vector, h_table_env[[i]][index, (l %% n)+1])
+      
+      }
+      
+      # construct a table with all information relating to the fitness contributions etc.
+      fitness_genotype <- cbind(h_vector, fitness_calculate(h_vector)) # calculate the total fitness (W) for each genotype
+      fitnesses <- rbind(fitnesses, fitness_genotype) # compilation of individual fitness contributions (h) and calculated fitness values (W)
+      
+    }
+    
+    # combine the genotype table and the fitness table
+    genotype_table_env[[i]] <- cbind(genotypes, fitnesses) # combining the genotype table and the fitness table
+    # columns 1 to n represent the allelic values at each locus in the genome encoding fitness in environment 1
+    # columns n+1 to n+(env*n) represent the allelic values at each locus in the genome encoding fitness in environment 2,...
+    # columns n+(env*n)+1 to 2n+(env*n) are the fitness contributions per locus (h) for loci in the genome encoding fitness in environment 1
+    # column 2n+(env*n)+1 is the calculated total fitness for each genotype taking into account all genetic interactions
+    
+    # store as data frame for ease of proceeding
+    genotype_table_env[[i]] <- as.data.frame(genotype_table_env[[i]])
+    colnames(genotype_table_env[[i]])[(n+1):(n+(env*n))] <- paste0("E2.", 1:(env*n)) # loci for environment 2; if env_tot = 1, this will be overwritten in next steps
+    colnames(genotype_table_env[[i]])[1:n] <- paste0("E1.", 1:n) # loci for environment 1
+    colnames(genotype_table_env[[i]])[(n+(env*n)+1):(2*n+(env*n))] <- paste0("h.", 1:n) # fitness contributions of each locus
+    colnames(genotype_table_env[[i]])[2*n+(env*n)+1] <- "fitness"
+    
+    # adding peak rank information
+    genotype_table_env[[i]]$rank <- dplyr::dense_rank(-genotype_table_env[[i]]$fitness) # highest fitness will have rank 1
+    
+  }
+  
+  landscape_combined <- genotype_table_env[[1]][, 1:(n*env_tot)] # one single data frame that shows rank and fitness for both environments
+  
+  for (e in 1:env_tot) {
+    
+    cols <- c(paste0("E", e, ".fitness"), paste0("E", e, ".rank"))
+    landscape_combined[, cols] <- genotype_table_env[[e]][, c("fitness", "rank")]
+    
+  }
+  
+  return(landscape_combined)
+
+}
 
 ```
+
+## 3) Adaptive walks on seascape = adaptive voyage?
+````{r adaptive voyage}
+
+adaptive_walk_sea <- function(landscape_df, # landscape on which to perform walk(s) -> the shape of the fitness landscape can change across abiotic environments
+                          walk = c("greedy", "random", "prop"), # types of walks
+                          n,
+                          env_tot, # total number of environments in the system
+                          IM_sea, # interaction matrix
+                          change, # "rounds of mutation spent in the same abiotic environment
+                          lambda_change, # if change = NA -> lambda of Poisson distribution
+                          start = c("WT", "R", "S"), # choosing starting genotype
+                          desired_start, # if I want to start at a specific genotype (start = "S")
+                          max_steps=100) # max. number of steps on the landscape before I interrupt
+{
+  
+  env <- env_tot - 1
+  
+  landscape_df$ID <- 1:nrow(landscape_df) # give genotypes an ID (we need this for our neighbour search later on)
+  
+  # define start genotypes
+  walks <- NULL # this is a dataframe to keep track of the genotypes during the adaptive walk
+  
+  if (start == "WT"){
+    
+walks <- landscape_df[1,] # this will give us the starting point of the adaptive walk; presumably we always start in environment 1
+      walks$step <- 0 # to signalise that this is the initial genotype
+      walks$env <- 1 # starting in environment 1
+
+  }
+  
+  if (start == "R"){
+    
+    random_seq <- sample(a, n*env_tot, replace = TRUE) # I'm just generating a random sequencing to start with; I guess right now this only works if a species experiences all abiotic environments (env = env_tot-1)
+    
+      walks <- landscape_df[rowSums(mapply(`==`, landscape_df[, 1:(n+n*env)], temp_seq)) == n+n*env,] # this will give us the starting point of the adaptive walk; I'm matching the entry in the genotype table to the random sequence I generated earlier here; we always start in environment 1
+      walks$step <- 0 # to signalise that this is the initial genotype
+      walks$env <- 1 # starting in environment 1
+      
+    }
+  
+  
+  if (start == "S"){
+    
+    specific_seq <- desired_start # this is to plug in the desired starting sequence
+    
+      walks <- landscape_df[rowSums(mapply(`==`, landscape_df[, 1:(n+n*env)], specific_seq)) == n+n*env,] # this will give us the starting point of the adaptive walk; I'm matching the entry in the genotype table to the desired sequence
+      walks$step <- 0 # to signalise that this is the initial genotype
+      walks$env <- 1 # starting in environment 1
+      
+    }
+    
+  }
+  
+  # set current genotype
+  current_genotypes <- walks # this will be updated as we navigate the landscape(s)
+  
+  # count steps
+  step <- 1
+  
+  # if change = NA
+  if(is.na(change)){
+    
+    repeat_env <- rpois(1, lambda = lambda_change)
+    
+  } 
+  
+  if(!is.na(change)) {
+    
+    repeat_env <- change
+    
+  }
+  
+  # repeat adaptive steps until a local maximum or the maximum allowed number of steps are reached
+  repeat { for (e in c(rep(1, repeat_env),2)){ # to switch between environments
+    # find neighbours and choose those with higher fitness
+    # need to determine how many there are; 
+    # - if 0, end simulation?; 
+    # - if 1, go there directly; 
+    # - if >1, do true adaptive walk depending on method of choice
+    
+      # find neighbours one step away
+    neighbours <- findNeighbours(landscape_df, current_genotypes$ID, n*env_tot)
+    
+    # filter those with higher or equal fitness than the current genotype
+    neighbours_fitter <- neighbours[which(neighbours[, paste0("E", e, ".fitness")] >= current_genotypes[, paste0("E", e, ".fitness"),]),]
+    
+    new_genotypes <- list()
+    
+    # first option - already at peak; then stay
+    if (nrow(neighbours_fitter) == 0) {
+      
+      new_genotypes <- current_genotypes[, c(1:(env_tot*n+env_tot*2+1))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
+      
+      # or there is only one high-fitness neighbor - go there directly
+    } else if (nrow(neighbours_fitter) == 1) {
+      
+      new_genotypes <- neighbours_fitter
+      
+      # or there are several high-fitness neighbors, choose fittest neighbour
+    } else if (walk == "greedy"){
+      
+      new_genotypes <- neighbours_fitter[which(neighbours_fitter[, paste0("E", e, ".fitness")] == max(neighbours_fitter[,paste0("E", e, ".fitness")])),]
+      
+      # choose random neighbour
+    } else if (walk == "random"){
+      
+      new_genotypes <- neighbours_fitter[sample(1:nrow(neighbours_fitter), 1),]
+      
+      # or choose neighbour with certain probability weighted by how much more fit they are                                  
+    } else if (walk == "prop"){
+      
+      new_genotypes <- neighbours_fitter[sample(1:nrow(neighbours_fitter), 1,
+                                       prob=(mapply('-', neighbours_fitter[, paste0("E", e, ".fitness")], current_genotypes[paste0("E", e, ".fitness")]))/abs(sum(mapply('-', neighbours_fitter[, paste0("E", e, ".fitness")], current_genotypes[paste0("E", e, ".fitness")])))),]
+    }
+    
+    # save step on landscape in my table to track the walk
+    walks <- rbind(walks, cbind(new_genotypes, step, env = e))
+    
+    # set up next step on landscape
+    current_genotypes <- new_genotypes
+    step <- step+1
+    
+    # stop if fitness for *all* species didn't change since last step
+    stop_test <- NULL
+    
+    # will take at least three steps to compare current fitness to two different time points in the past 
+    if (step > 3){
+    
+    for (e in 1:env_tot){
+      
+      # comparing fitness between now and last step as well as comparing fitness with now and two steps ago
+      if (walks[nrow(walks), paste0("E", e, ".fitness")] == walks[nrow(walks)-1, paste0("E", e, ".fitness")] &
+          walks[nrow(walks), paste0("E", e, ".fitness")] == walks[nrow(walks)-2, paste0("E", e, ".fitness")] &
+          walks[nrow(walks), paste0("E", e, ".fitness")] == walks[nrow(walks)-3, paste0("E", e, ".fitness")]) { # should probably be more dynamic to account for different rates of environmental changes
+        
+        stop_test <- c(stop_test, 1)
+        
+      }
+      
+    }
+    
+    }
+    
+    
+    if (length(stop_test) == env_tot) { break }
+      
+  }
+    
+    if (length(stop_test) == env_tot) { break }
+   
+    # stop after a number of steps if no optimum was reached (usually only an issue if there is cycling)
+    if (step > max_steps) { break } 
+    
+    # if R = NA; redraw repeat_env
+  if(is.na(change)){
+    
+    repeat_env <- rpois(1, lambda = lambda_change)
+    
+  }
+     
+  }
+  
+  return(walks)
+  
+}
+
+````
+
+
