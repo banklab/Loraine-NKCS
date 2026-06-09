@@ -1,7 +1,7 @@
 # Loraine-NKCS
-Loraine's code of the NKCS model in R - 17.04.2026
+Loraine's code of the NKCS model in R - 09.06.2026
 
-The code is based on the explanation of the NK model in Welch & Waxman (2005) + I used some code collected at https://www.cs.unibo.it/~fioretti/CODE/NK/ to help me implement the NKC model
+The code is based on the explanation of the NK model in Welch & Waxman (2005) + I used some code collected at https://www.cs.unibo.it/~fioretti/CODE/NK/ to help me implement the NKC model. Additionally, the code contains a seascapes implementation of the NK model, where the shape of the fitness landscape can change across abiotic environments (= abiotic equivalent of dynamic fitness landscapes to compare to biotically dynamic NKC landscapes).
 
 The NKCS model was originally introduced by Kauffman & Johnsen (1991)
 
