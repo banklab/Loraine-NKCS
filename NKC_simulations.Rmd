@@ -23,7 +23,7 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 
 ```
 
-# 1) Let's run the simulations!
+# 1) Let's run the NKC simulations!
 ## 1.1) defining parameters
 ```{r parameters}
 set.seed(2512) # for reproducibility
@@ -32,7 +32,7 @@ n = 2 # number of loci in each genome
 a = 2 # number of alleles at each locus
 s = 1 # number of species interacting
 s_tot = 2 # total number of species in the community
-R_lambda = 1 # if I want to draw the number of mutational steps from a poisson distribution
+lambda_R = 1 # if I want to draw the number of mutational steps from a poisson distribution
 scape_reps = 50 # number of landscape replicates
 fitness_contrib = "N" # distribution from which we draw fitness contributions
 fitness_calculation = "KJ" # way to calculate genotype fitness 
@@ -532,7 +532,7 @@ peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < ma
 peaks_total_cycle_summarised <- as.data.frame(peaks_total[peaks_total$step == max_steps,] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
                             dplyr::summarise(cycle_count = n())) 
-peaks_total_cycle_summarised$rank <- 17 # I assign the cycles rank "17" for plotting reasons 
+peaks_total_cycle_summarised$rank <- 17 # I assign the cycles rank "17" for plotting reasons; obvisouly only works for my 2 sp/2 loci setup 
 
 peaks_total_ranked_summarised <- merge(peaks_total_ranked_summarised, 
       peaks_total_cycle_summarised, 
@@ -652,5 +652,125 @@ save(peaks_total, # summary output of every single replicate walk on every repli
 
 
 
+### 2.) Let's rund the seascape simulations!
+## 2.1) Parameters
+```{r}
+set.seed(2512) # for reproducibility
 
+n = 2 # number of loci in each genome
+a = 2 # number of alleles at each locus
+p = 0 # number of pleiotropic loci
+env_tot = 2 # total number of species in the community
+lambda_change = 1 # if I want to draw the number of mutational steps from a poisson distribution
+scape_reps = 50 # number of landscape replicates
+fitness_contrib = "N" # distribution from which we draw fitness contributions
+fitness_calculation = "KJ" # way to calculate genotype fitness 
+fit_mean = 0 # mean of distribution from which we draw fitness contribution
+fit_sd = 0.5 # sd of distribution from which we draw fitness contribution
+walk_reps = 80 # number of replicates for adaptive walks on a fitness landscape - starting at each metagenotype 5 times
+walk_type = c("greedy", "random", "prop") # types of adaptive walks implemented
+walk_start = "S" # where to start the adaptive walks (R - Random, WT - wildtype, S - specified)
+max_steps = 250 # max number of steps in the adaptive walk
 
+# defining the starting sequences for N = 4, so I can cycle through all possible starting points
+types_n4 <- gtools::permutations(a, 4, c(1:a), repeats = TRUE) # all possible metagenotypes
+seqs_n4 <- split(types_n4, row(types_n4)) # break into list, where every metagenotype is an entry
+seqs_n4 <- lapply(seqs_n4, as.numeric) # converting into numbers
+
+# defining all the interaction matrices outside the simulations for more reproducibility
+IM_sea_temp <- matrix(4, 4, data = rep(0,16))
+
+# no genetic interaction; K = 0, K_e = 0
+IM_sea_k0_ke0 <- build_IMk(IM = "R",
+                      4,
+                      0,
+                      1,
+                      1) # only one possible layout
+
+# only interactions between loci that encode for the same environment; K = 1, K_e = 0
+IM_sea_k1_ke0 <- IM_sea_temp
+IM_sea_k1_ke0[1:n, 1:n] <- 1; IM_sea_k1_ke0[(n+1):(2*n), (n+1):(2*n)] <- 1
+IM_sea_k1_ke0 <- list(IM_sea_k1_ke0)
+
+# only interactions between loci that encode for different environments; K = 0, K_e = 1
+IM_sea_temp <- IM_sea_temp
+IM_sea_temp[row(IM_sea_temp) == col(IM_sea_temp)] <- 1
+IM_sea_k0_ke1 <- list()
+
+# "symmetric" -> borrowing from NKC
+# both loci interact with the same locus
+IM_sea_k0_ke1[[1]] <- IM_sea_temp
+IM_sea_k0_ke1[[1]][1:n, (n+1):(2*n)] <- IM_c1_n2[[1]][[1]]
+IM_sea_k0_ke1[[1]][(n+1):(2*n), 1:n] <- IM_c1_n2[[1]][[2]]
+
+# all loci interacting
+IM_sea_k0_ke1[[2]] <- IM_sea_temp
+IM_sea_k0_ke1[[2]][1:n, (n+1):(2*n)] <- IM_c1_n2[[2]][[1]]
+IM_sea_k0_ke1[[2]][(n+1):(2*n), 1:n] <- IM_c1_n2[[2]][[2]]
+
+# asymmetric
+# all loci involved in interaction
+IM_sea_k0_ke1[[3]] <- IM_sea_temp
+IM_sea_k0_ke1[[3]][1:n, (n+1):(2*n)] <- IM_c1_n2[[3]][[1]]
+IM_sea_k0_ke1[[3]][(n+1):(2*n), 1:n] <- IM_c1_n2[[3]][[2]]
+
+# all loci involved in interaction for one species; only one locus for the other
+IM_sea_k0_ke1[[4]] <- IM_sea_temp
+IM_sea_k0_ke1[[4]][1:n, (n+1):(2*n)] <- IM_c1_n2[[4]][[1]]
+IM_sea_k0_ke1[[4]][(n+1):(2*n), 1:n] <- IM_c1_n2[[4]][[2]]
+
+# within and between loci that encode for different environments; K = 1, K_e = 1
+IM_sea_temp <- IM_sea_k1_ke0[[1]]
+IM_sea_k1_ke1 <- list()
+
+# "symmetric" -> borrowing from NKC
+# both loci interact with the same locus
+IM_sea_k1_ke1[[1]] <- IM_sea_temp
+IM_sea_k1_ke1[[1]][1:n, (n+1):(2*n)] <- IM_c1_n2[[1]][[1]]
+IM_sea_k1_ke1[[1]][(n+1):(2*n), 1:n] <- IM_c1_n2[[1]][[2]]
+
+# all loci interacting
+IM_sea_k1_ke1[[2]] <- IM_sea_temp
+IM_sea_k1_ke1[[2]][1:n, (n+1):(2*n)] <- IM_c1_n2[[2]][[1]]
+IM_sea_k1_ke1[[2]][(n+1):(2*n), 1:n] <- IM_c1_n2[[2]][[2]]
+
+# asymmetric
+# all loci involved in interaction
+IM_sea_k1_ke1[[3]] <- IM_sea_temp
+IM_sea_k1_ke1[[3]][1:n, (n+1):(2*n)] <- IM_c1_n2[[3]][[1]]
+IM_sea_k1_ke1[[3]][(n+1):(2*n), 1:n] <- IM_c1_n2[[3]][[2]]
+
+# all loci involved in interaction for one species; only one locus for the other
+IM_sea_k1_ke1[[4]] <- IM_sea_temp
+IM_sea_k1_ke1[[4]][1:n, (n+1):(2*n)] <- IM_c1_n2[[4]][[1]]
+IM_sea_k1_ke1[[4]][(n+1):(2*n), 1:n] <- IM_c1_n2[[4]][[2]]
+
+# fully epistatic
+IM_sea_k1_ke1 <- matrix(4, 4, data = rep(1,16))
+
+```
+
+## 2.2) Run!
+```{r}
+set.seed(2512) # for reproducibility
+
+peaks_nkke_401 <- assess_peaks_sea(n, 
+                         k = 0,
+                         k_e = 1,
+                         a, 
+                         p,
+                         change = 1,
+                         lambda_change,
+                         env_tot,
+                         IM_seas = IM_sea_k0_ke1,
+                         scape_reps = 5, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps = 32, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = seqs_n4,
+                         max_steps)
+```

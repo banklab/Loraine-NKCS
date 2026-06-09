@@ -1593,8 +1593,7 @@ adaptive_walk_sea <- function(landscape_df, # landscape on which to perform walk
                           walk = c("greedy", "random", "prop"), # types of walks
                           n,
                           env_tot, # total number of environments in the system
-                          IM_sea, # interaction matrix
-                          change, # "rounds of mutation spent in the same abiotic environment
+                          change, # "rounds of mutation" spent in the same abiotic environment (rate of envrionmental change)
                           lambda_change, # if change = NA -> lambda of Poisson distribution
                           start = c("WT", "R", "S"), # choosing starting genotype
                           desired_start, # if I want to start at a specific genotype (start = "S")
@@ -1637,8 +1636,6 @@ walks <- landscape_df[1,] # this will give us the starting point of the adaptive
       
     }
     
-  }
-  
   # set current genotype
   current_genotypes <- walks # this will be updated as we navigate the landscape(s)
   
@@ -1754,4 +1751,131 @@ walks <- landscape_df[1,] # this will give us the starting point of the adaptive
 
 ````
 
+## 4) Replicate the adaptive walks on the seascape
+````{r replicates seascapes}
+assess_peaks_sea <- function(n, # nb. of loci
+                         k, # nb of interacting loci within an environment
+                           k_e, # nb of interacting loci between environments
+                         a, # nb. of alleles at each locus
+                         p, # pleiotropic loci - not implemented yet
+                         change, # "rounds of mutation" spent in the same abiotic environment (rate of envrionmental change)
+                          lambda_change, # if change = NA -> lambda of Poisson distribution
+                         env_tot, # total number of environments in the system
+                         IM_seas, # interaction matrix
+                         scape_reps, # nb. of replicates to generate fitness landscapes for each combination of IM_k and IM_c
+                         fitness_contrib, # how fitness contributions are drawn 
+                         fitness_calculation, # how fitness is calculated for genotypes
+                         fit_mean, # mean of fitness distribution when drawing from a normal distribution, or min fitness when drawing from a uniform distribution
+                         fit_sd, # sd of fitness distribution when drawing from a normal distribution, or max fitness when drawing from a uniform distribution
+                         walk_reps, # nb. of replicates of adaptive walks on a given landscape
+                         walk_type, # vector of types of adaptive walks (random, greedy, prop)
+                         walk_start, # starting genotype of adaptive walk (random, starting at reference type/WT, or starting at a specified sequence)
+                         start_seqs, # if I want to specify where the adaptive walk starts -> supplied as a list
+                         max_steps) # max nb. of steps in adaptive walk
+{
+  
+  env <- env_tot # for now assuming a species experiences every abiotic environment in the system
 
+# get number of replicates for interaction matrix
+  IM_sea_reps <- length(IM_seas)
+ 
+# for each combination of IM_k and IM_c make the landscapes and perform the random walks
+total_walks <- list()
+scapes_replicated <- list() # to store the landscapes
+
+peaks_df <- NULL #I want to save the endpoints of all walks in one df
+total_walks[[IM_sea_reps]] <- list()
+
+for (sea_rep in 1:IM_sea_reps) {
+  
+  IM_sea <- IM_seas[[sea_rep]]
+  
+  scapes_replicated[[sea_rep]] <- list()
+  
+    # create the landscapes
+  for (scape_rep in 1:scape_reps) {
+    
+    scapes_replicated[[sea_rep]][[scape_rep]] <- build_seascape(IM_sea,
+                fitness_contrib,
+                fitness_calculation,
+                n,
+                k,
+                k_e,
+                a,
+                env_tot,
+                p,
+                fit_mean,
+                fit_sd)
+    
+    # identify the global fitness peak for each landscape
+    global_peaks <- list()
+    
+    for (e in 1:env_tot){
+      
+      global_peaks[[e]] <-  max(scapes_replicated[[sea_rep]][[scape_rep]][, paste0("E", e, ".fitness")])
+      
+    }
+    
+    # for each landscape perform the adaptive walks
+    total_walks[[sea_rep]][[scape_rep]] <- list()
+    
+    for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
+
+    walks_replicated <- list()
+    
+    # perform the walk
+    for (walk_rep in 1:walk_reps) {
+      
+      if (walk_start == "S"){
+        
+        desired_start <- start_seqs[[walk_rep %% length(start_seqs) + 1]]
+          
+      }
+      
+      walks_replicated[[walk_rep]] <- adaptive_walk_sea(scapes_replicated[[sea_rep]][[scape_rep]], 
+              walk = walking,
+              n,
+              env_tot, 
+              change,
+              lambda_change,
+              start = walk_start,
+              desired_start,
+              max_steps)
+      
+      # store the desired information (endpoint of walk and simulation parameters)
+      start_seq <- paste(walks_replicated[[walk_rep]][1, c(1:(n*env_tot))], collapse = "") # I want to save the starting point of each adaptive walk
+        
+        # and then keep track of the end points of each walk here; I am saving the end point of the walk alongside the simulation parameters
+        peaks_df <- rbind(peaks_df, cbind(walks_replicated[[walk_rep]][nrow(walks_replicated[[walk_rep]]),], data.frame(sea_rep,
+                                                                                                                                              scape_rep, 
+                                                                                                                                              walk_rep, 
+                                                                                                                                              n,
+                                                                                                                                              k,
+                                                                                                                                              k_e,
+                                                                                                                                              a,
+                                                                                                                                              env_tot,
+                                                                                                                                              walk_start,
+                                                                                                                                              walking,
+                                                                                                                                              start_seq,
+                                                                                                                                              global_peak_E1 = global_peaks[[1]],
+                                                                                                                                              global_peak_E2 = global_peaks[[2]])))
+        
+      
+      
+    }
+    
+    total_walks[[sea_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
+    
+    }
+    
+  }
+  
+}
+
+return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
+            IM_seas, # interaction matrices 
+            scapes_replicated, # all the fitness landscapes
+            total_walks)) # the individual adaptive walks
+
+}
+````
