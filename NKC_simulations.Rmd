@@ -3,7 +3,8 @@ title: "NKC_exploration"
 output: html_notebook
 ---
 
-Loraine Hablützel - 01.04.2026
+Loraine Hablützel - 09.06.2026
+see preprint: https://doi.org/10.64898/2026.04.01.715933
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -563,7 +564,6 @@ peaks_total_ranked_summarised_R$prop_rank_peaked <- peaks_total_ranked_summarise
 peaks_total_ranked_summarised_R$prop_cycle <- peaks_total_ranked_summarised_R$cycle_count/peaks_total_ranked_summarised_R$tot_reps
 
 
-
 ####### above, all df have separate rows for the different species; here we combine both
 # combine both species into a single data frame and give each landscape a unique ID
 peaks_total_ranked2 <- as.data.frame(peaks_total[peaks_total$n == 2 &
@@ -662,22 +662,22 @@ a = 2 # number of alleles at each locus
 p = 0 # number of pleiotropic loci
 env_tot = 2 # total number of species in the community
 lambda_change = 1 # if I want to draw the number of mutational steps from a poisson distribution
-scape_reps = 50 # number of landscape replicates
+scape_reps = 10 # number of landscape replicates
 fitness_contrib = "N" # distribution from which we draw fitness contributions
 fitness_calculation = "KJ" # way to calculate genotype fitness 
 fit_mean = 0 # mean of distribution from which we draw fitness contribution
 fit_sd = 0.5 # sd of distribution from which we draw fitness contribution
-walk_reps = 80 # number of replicates for adaptive walks on a fitness landscape - starting at each metagenotype 5 times
+walk_reps = 32 # number of replicates for adaptive walks on a fitness landscape - starting at each metagenotype 5 times
 walk_type = c("greedy", "random", "prop") # types of adaptive walks implemented
 walk_start = "S" # where to start the adaptive walks (R - Random, WT - wildtype, S - specified)
-max_steps = 250 # max number of steps in the adaptive walk
+max_steps = 100 # max number of steps in the adaptive walk
 
 # defining the starting sequences for N = 4, so I can cycle through all possible starting points
 types_n4 <- gtools::permutations(a, 4, c(1:a), repeats = TRUE) # all possible metagenotypes
 seqs_n4 <- split(types_n4, row(types_n4)) # break into list, where every metagenotype is an entry
 seqs_n4 <- lapply(seqs_n4, as.numeric) # converting into numbers
 
-# defining all the interaction matrices outside the simulations for more reproducibility
+# defining all the interaction matrices outside the simulations for more reproducibility; for this we can implement interaction patterns for k_e that follow interactions for c in the NKC model (types of interaction matrices)
 IM_sea_temp <- matrix(4, 4, data = rep(0,16))
 
 # no genetic interaction; K = 0, K_e = 0
@@ -719,6 +719,11 @@ IM_sea_k0_ke1[[4]] <- IM_sea_temp
 IM_sea_k0_ke1[[4]][1:n, (n+1):(2*n)] <- IM_c1_n2[[4]][[1]]
 IM_sea_k0_ke1[[4]][(n+1):(2*n), 1:n] <- IM_c1_n2[[4]][[2]]
 
+# only interactions between loci that encode for different environments; K = 0, K_e = 2
+IM_sea_k0_ke2 <- list(IM_sea_temp)
+IM_sea_k0_ke2[[1]][1:n, (n+1):(2*n)] <- matrix(2, 2, data = rep(1,4))
+IM_sea_k0_ke2[[1]][(n+1):(2*n), 1:n] <- matrix(2, 2, data = rep(1,4))
+
 # within and between loci that encode for different environments; K = 1, K_e = 1
 IM_sea_temp <- IM_sea_k1_ke0[[1]]
 IM_sea_k1_ke1 <- list()
@@ -746,13 +751,33 @@ IM_sea_k1_ke1[[4]][1:n, (n+1):(2*n)] <- IM_c1_n2[[4]][[1]]
 IM_sea_k1_ke1[[4]][(n+1):(2*n), 1:n] <- IM_c1_n2[[4]][[2]]
 
 # fully epistatic
-IM_sea_k1_ke1 <- matrix(4, 4, data = rep(1,16))
+IM_sea_k1_ke2 <- list(matrix(4, 4, data = rep(1,16)))
 
 ```
 
 ## 2.2) Run!
 ```{r}
 set.seed(2512) # for reproducibility
+
+peaks_nkke_400 <- assess_peaks_sea(n, 
+                         k = 0,
+                         k_e = 0,
+                         a, 
+                         p,
+                         change = 1,
+                         lambda_change,
+                         env_tot,
+                         IM_seas = IM_sea_k0_ke0,
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = seqs_n4,
+                         max_steps)
 
 peaks_nkke_401 <- assess_peaks_sea(n, 
                          k = 0,
@@ -763,14 +788,137 @@ peaks_nkke_401 <- assess_peaks_sea(n,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k0_ke1,
-                         scape_reps = 5, 
+                         scape_reps, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
                          fit_sd, 
-                         walk_reps = 32, 
+                         walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
                          max_steps)
+
+peaks_nkke_402 <- assess_peaks_sea(n, 
+                         k = 0,
+                         k_e = 2,
+                         a, 
+                         p,
+                         change = 1,
+                         lambda_change,
+                         env_tot,
+                         IM_seas = IM_sea_k0_ke2,
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = seqs_n4,
+                         max_steps)
+
+peaks_nkke_410 <- assess_peaks_sea(n, 
+                         k = 1,
+                         k_e = 0,
+                         a, 
+                         p,
+                         change = 1,
+                         lambda_change,
+                         env_tot,
+                         IM_seas = IM_sea_k1_ke0,
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = seqs_n4,
+                         max_steps)
+
+peaks_nkke_411 <- assess_peaks_sea(n, 
+                         k = 1,
+                         k_e = 1,
+                         a, 
+                         p,
+                         change = 1,
+                         lambda_change,
+                         env_tot,
+                         IM_seas = IM_sea_k1_ke1,
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = seqs_n4,
+                         max_steps)
+
+peaks_nkke_412 <- assess_peaks_sea(n, 
+                         k = 1,
+                         k_e = 2,
+                         a, 
+                         p,
+                         change = 1,
+                         lambda_change,
+                         env_tot,
+                         IM_seas = IM_sea_k1_ke2,
+                         scape_reps, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start, 
+                         start_seqs = seqs_n4,
+                         max_steps)
+
+peaks_total_sea <- dplyr::bind_rows(peaks_nkke_400[[1]], # combine all simulations in one main data frame
+                                    peaks_nkke_401[[1]],
+                                    peaks_nkke_402[[1]],
+                                    peaks_nkke_410[[1]],
+                                    peaks_nkke_411[[1]],
+                                    peaks_nkke_412[[1]]) 
+
+peaks_total_sea$E1.reached <- peaks_total_sea$E1.fitness == peaks_total_sea$global_peak_E1 # I could also just check if rank == 1... O:-)
+peaks_total_sea$E2.reached <- peaks_total_sea$E2.fitness == peaks_total_sea$global_peak_E2
+```
+
+## 2.3) summarise
+```{r}
+peaks_sea_ranked_summarised <- as.data.frame(peaks_total_sea[peaks_total_sea$step < max_steps,] |> 
+                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank) |>
+                            dplyr::summarise(rank_peaked = n())) 
+peaks_sea_ranked_summarised$cycle <- "no"
+
+peaks_sea_cycle_summarised <- as.data.frame(peaks_total_sea[peaks_total_sea$step == max_steps,] |> 
+                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank) |>
+                            dplyr::summarise(cycle_count = n())) 
+peaks_sea_cycle_summarised$cycle <- "yes" 
+peaks_sea_cycle_summarised$E1.rank <- 17 # for plotting reasons
+peaks_sea_cycle_summarised$E2.rank <- 17 # for plotting reasons
+
+peaks_sea_ranked_summarised <- merge(peaks_sea_ranked_summarised, 
+      peaks_sea_cycle_summarised, 
+      all.x = TRUE, all.y = TRUE)
+
+## calculate percentages 
+peaks_sea_ranked_summarised$tot_reps <- walk_reps
+peaks_sea_ranked_summarised$prop_rank_peaked <- peaks_sea_ranked_summarised$rank_peaked/peaks_sea_ranked_summarised$tot_reps
+peaks_sea_ranked_summarised$prop_cycle <- peaks_sea_ranked_summarised$cycle_count/peaks_sea_ranked_summarised$tot_reps
+
+save(peaks_total_sea, peaks_sea_ranked_summarised, peaks_nkke_400, # combine all simulations in one main data frame
+                                    peaks_nkke_401,
+                                    peaks_nkke_402,
+                                    peaks_nkke_410,
+                                    peaks_nkke_411,
+                                    peaks_nkke_412,
+     file = "seascapes")
+
 ```

@@ -3,7 +3,8 @@ title: "NKC(S)"
 output: html_notebook
 ---
 
-Loraine Hablützel - 01.04.2026
+Loraine Hablützel - 09.06.2026
+see preprint: https://doi.org/10.64898/2026.04.01.715933
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -1666,15 +1667,15 @@ walks <- landscape_df[1,] # this will give us the starting point of the adaptive
       # find neighbours one step away
     neighbours <- findNeighbours(landscape_df, current_genotypes$ID, n*env_tot)
     
-    # filter those with higher or equal fitness than the current genotype
-    neighbours_fitter <- neighbours[which(neighbours[, paste0("E", e, ".fitness")] >= current_genotypes[, paste0("E", e, ".fitness"),]),]
+    # filter those with higher fitness than the current genotype
+    neighbours_fitter <- neighbours[which(neighbours[, paste0("E", e, ".fitness")] > current_genotypes[, paste0("E", e, ".fitness"),]),] # NKC was greater or equal to...
     
     new_genotypes <- list()
     
     # first option - already at peak; then stay
     if (nrow(neighbours_fitter) == 0) {
       
-      new_genotypes <- current_genotypes[, c(1:(env_tot*n+env_tot*2+1))] # stay - maybe something will happen in another species; will update step and focal species at the end of this go
+      new_genotypes <- current_genotypes[, c(1:(env_tot*n+env_tot*2+1))] # stay - maybe something will happen in another environment
       
       # or there is only one high-fitness neighbor - go there directly
     } else if (nrow(neighbours_fitter) == 1) {

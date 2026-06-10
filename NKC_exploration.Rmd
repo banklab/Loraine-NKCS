@@ -3,7 +3,9 @@ title: "NKC_exploration"
 output: html_notebook
 ---
 
-Loraine Hablützel - 01.04.2026
+Loraine Hablützel - 09.06.2026
+
+This is the code used to produce all figures in the manuscript "Repeatability of adaptation in interacting" species; note that in the code I refer to species as "species 1" and "species 2" and that alleles are encoded as 1s (reference/WT allele) and 2s (mutant/alternate allele).
 
 
 ```{r setup, include=FALSE}
@@ -24,7 +26,7 @@ library(ggtext) # to get different colour axis titles
 library(ggraph) # for plotting networks -> adaptive walks representation
 library(igraph) # for plotting networks -> adaptive walks representation
 
-library(ggarrow) # to plot individual cycles
+#library(ggarrow) # to plot individual cycles; this is just for the fun additional figures
 library(ggpubr) # to arrange multiple figures
 library(egg) # to make plot insets
 
@@ -35,6 +37,7 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # to get the landscape visualisati
 
 # load data of simulations
 load("peaks_total7") 
+load("seascapes")
 
 ```
 
@@ -104,7 +107,7 @@ visual_test_df <- visual_landscape(scapes_combined,
                  s = 1) # this is how I get the transitions between metagenotypes
 
 # now I plot
-lanscape_Rsqrd <- ggplot(visual_test_df,
+landscape_Rsqrd <- ggplot(visual_test_df,
        aes(x = rank_sp1,
            y = rank_sp2)) +
   geom_line(data = visual_test_df[visual_test_df$mut == "intra",],
@@ -140,8 +143,8 @@ ggsave(path = "../Figures/",
        units = c("cm"),
        width = 19,
        height = 17,
-       filename = "lanscape_Rsqrd_NKC_211_2_13.pdf",
-       plot = lanscape_Rsqrd)
+       filename = "landscape_Rsqrd_NKC_211_2_13.pdf",
+       plot = landscape_Rsqrd)
 
 ## versions of this figure I used in a presentation showing how to go from one-dimensional fitness mapping to two-dimensional fitness mapping
 # lanscape_Rsqrd_sp1 <- ggplot(visual_test_df[visual_test_df$background == "bb",],
@@ -336,7 +339,7 @@ ggsave(path = "../Figures/",
 ```
 
 ## Fig 4c Repeatability N' = 4
-To have a refernce for comparison of the intergenomic epistasis results, we also assess adaptation on equivalent single-species landscape with N' = 4 and K' = K + C
+To have a reference for comparison of the intergenomic epistasis results, we also assess adaptation on equivalent single-species landscape with N' = 4 and K' = K + C
 ```{r}
 localrep_N4 <- ggplot(peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 4 &
                                        peaks_total_ranked_summarised$walking == "random",], # only random walks in main text
@@ -764,6 +767,7 @@ for (scape_ID in unique(cycles_df$landscape_ID)){
 ## Fig. 6 - fitness cost/interaction matrices C = 1
 This is the figure that shows how fitness load is distributed for species and how asymmetry in fitness load can arise due to specific genetic interactions (the intergenomic interaction networks)
 ```{r}
+# taking the cycle results and putting them into the same format as the equlibrium results because I did not do that earlier...
 df_cycles_sp1 <- data.frame(k = summary_cycles$k,
                               c = summary_cycles$c,
                               n = summary_cycles$n,
@@ -799,17 +803,20 @@ df_cycles_sp2 <- data.frame(k = summary_cycles$k,
                             cycle = rep("yes", nrow(summary_cycles)))
 
 
-peaks_total_ranked_w_cycles <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$rank != 17,]
+# make a new data frame with equilibrium results + explicit cycle results
+peaks_total_ranked_w_cycles <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$rank != 17,] # get rid of broad "cycle" classification (rank 17) 
 peaks_total_ranked_w_cycles$cycle <- "no"
 peaks_total_ranked_w_cycles <- rbind(peaks_total_ranked_w_cycles, df_cycles_sp1, df_cycles_sp2)
 
+# calculate the proportion of each outcome across all observations
 prop_peaks_cycle <- peaks_total_ranked_w_cycles %>%
-  group_by(n, k, c, rank, walking, species, c_rep) %>%
-  summarise(count = sum(rank_peaked)) %>%
-  group_by(n, k, c, walking, c_rep, species) %>%
-  mutate(tot = sum(count)) %>%
-  mutate(prop = count/tot)
+  group_by(n, k, c, rank, walking, species, c_rep) %>% # group by what I am interested in 
+  summarise(count = sum(rank_peaked)) %>% # count number of observations
+  group_by(n, k, c, walking, c_rep, species) %>% # what are my groupings?
+  mutate(tot = sum(count)) %>% 
+  mutate(prop = count/tot) # calculate proportion of outcomes
 
+# plot
 IM_fitness_species <- ggplot(prop_peaks_cycle[prop_peaks_cycle$n == 2 &
                                          prop_peaks_cycle$c == 1 &
                                            prop_peaks_cycle$species == 1 &
@@ -855,7 +862,7 @@ IM_fitness_species <- ggplot(prop_peaks_cycle[prop_peaks_cycle$n == 2 &
            width = 0.4) +
      theme_bw() +
   facet_grid(c_rep ~ k) +
-  scale_x_continuous(labels = c("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), 
+  scale_x_continuous(labels = c("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15"), # load is rank - 1
                      breaks = c(1:16),
                      limits = c(0.5,16.5),
                    name = "Fitness load (rank difference to global peak)",
@@ -892,7 +899,7 @@ ggsave(path = "../Figures/",
 ```
 
 ## Fig 7 - correlation-fitness relationship
-Next, we show how the correlation of fitness ranks between the species can reveal some trends on how lare the expected fitnes cost of a species is
+Next, we show how the correlation of fitness ranks between the species can reveal some trends on how large the fitness cost of a species is
 ```{r}
 
 # for this I first need to calculate the correlation of fitness ranks for all fitness landscapes with different combinations of C and K; but I'm only interested in cases with C > 0
@@ -1082,18 +1089,18 @@ for (i in 1:nrow(community_ranked_w_cycles)){
 eco_outcome <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr_rank) &
                                                        peaks_total_ranked2_summarised$k == 0 &
                                                        peaks_total_ranked2_summarised$c == 1 &
-                                                       peaks_total_ranked2_summarised$rank_sp1 != 17,],
+                                                       peaks_total_ranked2_summarised$rank_sp1 != 17,], # will add in the explicit cycle results afterwards
        aes(x = corr_rank,
            y = rank_sp1)) +
-  geom_hline(yintercept = 1,
+  geom_hline(yintercept = 1, # plot horizontal line for 0 fitness load
              col = "grey") +
-   geom_segment(aes(x = corr_rank, 
+   geom_segment(aes(x = corr_rank, # connect fitness load of interacting species pair
       y = rank_sp1, 
       xend = corr_rank, 
       yend = rank_sp2,
       alpha = rank_peaked/80),
       col = "grey40") +
-  geom_segment(data = summary_cycles[summary_cycles$k == 0 & 
+  geom_segment(data = summary_cycles[summary_cycles$k == 0 & # connect fitness load of interacting species pair in cycle
                                    summary_cycles$c == 1,],
                aes(x = corr_rank, 
       y = mean_rank_sp1, 
@@ -1101,25 +1108,25 @@ eco_outcome <- ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_
       yend = mean_rank_sp2,
       alpha = appeared/80),
       col = "grey40") +
-  geom_point(size = 2.5,
+  geom_point(size = 2.5, # species 1
              aes(alpha = rank_peaked/80,
                  col = "Equilibrium")) +
   geom_point(aes(x = corr_rank,
-                 y = rank_sp2,
+                 y = rank_sp2, # species 2
                  alpha = rank_peaked/80,
                  col = "Equilibrium"),
              size = 2.5) +
   geom_point(data = summary_cycles[summary_cycles$k == 0 & 
                                    summary_cycles$c == 1,],
              aes(x = corr_rank,
-                 y = mean_rank_sp1,
+                 y = mean_rank_sp1, # species 1 from cycles
                  alpha = appeared/80,
                  col = "Cycle"),
              size = 2.5) +
   geom_point(data = summary_cycles[summary_cycles$k == 0 & 
-                                   summary_cycles$c == 1,],
+                                   summary_cycles$c == 1,], 
              aes(x = corr_rank,
-                 y = mean_rank_sp2,
+                 y = mean_rank_sp2, # species 2 from cycles
                  alpha = appeared/80,
                  col = "Cycle"),
              size = 2.5) +
@@ -1300,8 +1307,9 @@ ggsave(path = "../Figures/",
 Here we show which fitness outcomes are the most common, which gives us the expected fitness distribution for each combination of K and C; this figure also shows the cycling probability
 ```{r}
 peaks_total_ranked_fixed <- peaks_total_ranked_summarised
-peaks_total_ranked_fixed[is.na(peaks_total_ranked_fixed$rank_peaked), "rank_peaked"] <- peaks_total_ranked_fixed[is.na(peaks_total_ranked_fixed$rank_peaked), "cycle_count"]
+peaks_total_ranked_fixed[is.na(peaks_total_ranked_fixed$rank_peaked), "rank_peaked"] <- peaks_total_ranked_fixed[is.na(peaks_total_ranked_fixed$rank_peaked), "cycle_count"] # I need to fix the fact that I previously counted cycles separately from equilibrium outcomes
 
+# calculate the proportion of outcomes
 prop_peaks <- peaks_total_ranked_fixed %>%
   group_by(n, k, c, rank, walking) %>%
   summarise(count = sum(rank_peaked)) %>%
@@ -1358,11 +1366,11 @@ ggsave(path = "../Figures/",
 ```
 
 ## fitness load - cycles vs. equilibrium + species vs community
-Another way to visualise fitness load at the species and the community level
+Another way to visualise fitness load at the species and the community level simultaniously
 ```{r}
 peaks_total_ranked_w_cycles$community <- "no"
 
-
+# calculate proportion of outcomes
 prop_peaks <- peaks_total_ranked_w_cycles %>%
   group_by(n, k, c, cycle, rank, walking, community) %>%
   summarise(count = sum(rank_peaked)) %>%
@@ -1370,7 +1378,7 @@ prop_peaks <- peaks_total_ranked_w_cycles %>%
   mutate(tot = sum(count)) %>%
   mutate(prop = count/tot)
 
-# community
+# make new community data frame with cycling results
 df_cycles_community <- data.frame(k = summary_cycles$k,
                               c = summary_cycles$c,
                               n = summary_cycles$n,
@@ -1391,6 +1399,7 @@ community_ranked_w_cycles$cycle <- "no"
 community_ranked_w_cycles$community <- "yes"
 community_ranked_w_cycles <- rbind(community_ranked_w_cycles, df_cycles_community)
 
+# calculate proportions
 prop_community_cycle <- community_ranked_w_cycles %>%
   group_by(n, k, c, rank_sp1, rank_sp2, community, cycle) %>%
   summarise(count = sum(rank_peaked)) %>%
@@ -1398,6 +1407,7 @@ prop_community_cycle <- community_ranked_w_cycles %>%
   mutate(tot = sum(count)) %>%
   mutate(prop = count/tot)
 
+# plot
 fitness_species <- ggplot(prop_peaks[prop_peaks$n == 2 &
                                        prop_peaks$c != 0 &
                             prop_peaks$cycle == "no" &
@@ -1417,10 +1427,10 @@ fitness_species <- ggplot(prop_peaks[prop_peaks$n == 2 &
                                          prop_community_cycle$cycle == "yes",],
            aes(x = (rank_sp1 + rank_sp2)/2+0.125,
                group = (rank_sp1 + rank_sp2)/2,
-               y = -prop,
+               y = -prop, # "mirror" community fitness load at the the y = 0 line
                fill = interaction(community, cycle)),
            width = 0.25) +
-  geom_col(aes(group = cycle,
+  geom_col(aes(group = cycle, # plot cycles separately
                fill = interaction(community, cycle),
                x = rank-0.125),
            width = 0.25) + 
@@ -3538,5 +3548,129 @@ ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr
                      transform = "log10",
        sec.axis = sec_axis(~ . , name = "K", breaks = NULL, labels = NULL)) +
   theme_classic()
+
+```
+
+
+## XXXX) Seascapes!!!
+# R^2 representation
+```{r}
+
+
+# recoding fitness landscapes; 
+## in my model the alleles are encoded as 1 and 2, but I would different alleles for the two species to better distinguish them (differences in metagenotypes should be easier to spot this way)
+
+scape_env <- peaks_nkke_411[[3]][[2]][[2]] # take desired landscape replicate 
+
+# recode alleles for focal species 
+scape_env[scape_env$E1.1 == 1, "E1.1"] <- "a" 
+scape_env[scape_env$E1.1 == 2, "E1.1"] <- "A"
+scape_env[scape_env$E1.2 == 1, "E1.2"] <- "a"
+scape_env[scape_env$E1.2 == 2, "E1.2"] <- "A"
+
+# recode alleles for partner species
+scape_env[scape_env$E2.1 == 1, "E2.1"] <- "b"
+scape_env[scape_env$E2.1 == 2, "E2.1"] <- "B"
+scape_env[scape_env$E2.2 == 1, "E2.2"] <- "b"
+scape_env[scape_env$E2.2 == 2, "E2.2"] <- "B"
+
+
+scape_env$gen_E1 <- paste0(scape_env$E1.1, scape_env$E1.2) # genotype for environment 1
+scape_env$gen_E2 <- paste0(scape_env$E2.1, scape_env$E2.2) # genotype for environment 2
+
+# now I use my function from the NKC(S) code file to infer which metagenotypes are one-mutation step neighbours
+visual_sea_df <- visual_landscape(scape_env,
+                 n = 2,
+                  c = 1,
+                 s = 1) # this is how I get the transitions between metagenotypes
+
+# now I plot
+seascape_Rsqrd <- ggplot(visual_sea_df,
+       aes(x = E1.rank,
+           y = E2.rank)) +
+  geom_line(data = visual_sea_df[visual_sea_df$mut == "intra",],
+            aes(group = group,
+                linetype = mut,
+                col = gen_E2),
+            linewidth = 0.75) +
+  geom_line(data = visual_sea_df[visual_sea_df$mut == "inter",],
+            aes(group = group,
+                linetype = mut),
+            col = "grey",
+            linewidth = 0.5) +
+  geom_label(label = visual_sea_df$seq,
+             aes(col = gen_E2),
+             linewidth = 0.6, # thickness of label border in mm
+             size = 4.5, # size of label in mm
+             fontface = "bold" # bold font
+             ) +
+  scale_x_continuous(breaks = c(1:16),
+                     name = "Fitness rank in environment 1") +
+  scale_y_continuous(breaks = c(1:16),
+                     name = "Fitness rank in environment 2") +
+  scale_colour_manual(values = c("dodgerblue", "darkblue", "slategrey", "purple"))+
+  scale_linetype_manual(breaks = c("intra", "inter"),
+                        values = c("solid", "dashed"))+
+  ylab("Fitness rank partner species") +
+  theme_classic() +
+  fig_theme
+
+```
+
+```{r}
+
+localrep_sea4 <- ggplot(peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$walking == "random",], # only random walks in main text
+        aes(y = prop_rank_peaked, # plot proportions
+            x = E1.rank,
+            group = E1.rank)) +
+  geom_violin(col = "grey45") +
+  geom_violin(aes(y = prop_cycle, # I counted the cycles separately in the data frame, so we will handle them separately as well
+                  x = E1.rank),
+              col = "grey45") +
+  geom_jitter(col = "forestgreen", # for equilibrium points
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  geom_jitter(aes(y = prop_cycle,
+                  x = E1.rank),
+               col = "skyblue", # for cycling points
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  stat_summary(aes(y = prop_cycle, # adds the mean proportion of cycling/landscape
+                  x = E1.rank),
+               fun = mean,
+               geom = "crossbar",
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(aes(y = prop_cycle, # adds the median proportion of cycling/landscape
+                  x = E1.rank),
+               fun = median,
+               geom = "point",
+               shape = 18,
+               size = 3,
+               col = "black") +
+     theme_bw() +
+  facet_grid(k_e ~ k) +
+  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :-)
+                     breaks = c(1:17),
+                   name = "Fitness rank at the end of adaptive walk",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenic epistasis, ", italic(K))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Proportion of adaptive walks/landscape",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenic epistasis, ", italic(Ke))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
+  fig_theme
 
 ```
