@@ -24,7 +24,7 @@ source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from th
 
 ```
 
-# 1) Let's run the NKC simulations!
+# 1) NK(C) simulations!
 ## 1.1) defining parameters
 ```{r parameters}
 set.seed(2512) # for reproducibility
@@ -490,7 +490,7 @@ peaks_nkcs_2121_Random <- assess_peaks_R_input(n,
                          max_steps)
 
 
-## N = 4
+## N' = 4 (static NK comparison)
 set.seed(2512)
 
 peaks_nkcs_4101 <- assess_peaks_R(n = 4, 
@@ -556,9 +556,9 @@ peaks_nkcs_4301 <- assess_peaks_R(n = 4,
                          start_seqs = metaseqs_n4, 
                          max_steps)
 
-peaks_total <- dplyr::bind_rows(peaks_nkcs_4101[[1]],
-                                peaks_nkcs_4201[[1]],
-                                peaks_nkcs_4301[[1]],
+peaks_total <- dplyr::bind_rows(#peaks_nkcs_4101[[1]],
+                                #peaks_nkcs_4201[[1]],
+                                #peaks_nkcs_4301[[1]],
                                 peaks_nkcs_2121[[1]],
                                 peaks_nkcs_2111[[1]],
                                 peaks_nkcs_2101[[1]],
@@ -740,13 +740,13 @@ save(peaks_total, # summary output of every single replicate walk on every repli
 
 
 
-# 2.) Let's run the seascapes simulations!
+# 2.) Seascapes simulations!
 ## 2.1) Parameters
 ```{r}
 set.seed(2512) # for reproducibility
 
 # most parameters are kept the same from the NKC simulations; therefor the parameters chunk from the NKC model must be run before this
-p = 0 # number of pleiotropic loci; I have not actually implemented this yet lol but I also don't need it
+p = 0 # number of pleiotropic loci; I have not actually implemented this yet lol but I also don't need it - take it as future inspiration
 env_tot = 2 # total number of environments in the system
 lambda_change = 1 # if I want to draw the number of mutational steps from a poisson distribution
 max_steps = 100 # max number of steps in the adaptive walk; here shorter than for the NKC simulations since equilibrium is reached faster
@@ -834,125 +834,154 @@ IM_sea_k1_ke2 <- list(matrix(4, 4, data = rep(1,16)))
 
 ```
 
-## 2.2) Sail the seascapes
+## 2.2) Convert NKC landscapes
+```{r}
+
+scapes_nkke_400 <- NKC_to_NKsea(peaks_nkcs_2001[[4]],
+             env_tot = 2,
+             k_reps = 1,
+             c_reps = 1,
+             scape_reps = 200,
+             n = 2)
+
+scapes_nkke_401 <- NKC_to_NKsea(peaks_nkcs_2011[[4]],
+             env_tot = 2,
+             k_reps = 1,
+             c_reps = 4,
+             scape_reps = 50,
+             n = 2)
+
+scapes_nkke_402 <- NKC_to_NKsea(peaks_nkcs_2021[[4]],
+             env_tot = 2,
+             k_reps = 1,
+             c_reps = 1,
+             scape_reps = 200,
+             n = 2)
+
+scapes_nkke_410 <- NKC_to_NKsea(peaks_nkcs_2101[[4]],
+             env_tot = 2,
+             k_reps = 1,
+             c_reps = 1,
+             scape_reps = 200,
+             n = 2)
+
+scapes_nkke_411 <- NKC_to_NKsea(peaks_nkcs_2111[[4]],
+             env_tot = 2,
+             k_reps = 1,
+             c_reps = 4,
+             scape_reps = 50,
+             n = 2)
+
+scapes_nkke_412 <- NKC_to_NKsea(peaks_nkcs_2121[[4]],
+             env_tot = 2,
+             k_reps = 1,
+             c_reps = 1,
+             scape_reps = 200,
+             n = 2)
+
+```
+
+## 2.3) Sail the seascapes
 ```{r}
 set.seed(2512) # for reproducibility
 
 # regular switching between abiotic environments
-peaks_nkke_400 <- assess_peaks_sea(n, 
+peaks_nkke_400 <- assess_peaks_sea_input(n, 
                          k = 0,
                          k_e = 0,
                          a, 
                          p,
-                         change = 1,
+                         change = 2,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k0_ke0,
-                         scape_reps = 200, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
+                         scapes_nkke_400, 
+                         scape_reps = 200,
                          walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
                          max_steps)
 
-peaks_nkke_401 <- assess_peaks_sea(n, 
+peaks_nkke_401 <- assess_peaks_sea_input(n, 
                          k = 0,
                          k_e = 1,
                          a, 
                          p,
-                         change = 1,
+                         change = 2,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k0_ke1,
+                         scapes_nkke_401,
                          scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
                          max_steps)
 
-peaks_nkke_402 <- assess_peaks_sea(n, 
+peaks_nkke_402 <- assess_peaks_sea_input(n, 
                          k = 0,
                          k_e = 2,
                          a, 
                          p,
-                         change = 1,
+                         change = 2,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k0_ke2,
+                         scapes_nkke_402,
                          scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
                          max_steps)
 
-peaks_nkke_410 <- assess_peaks_sea(n, 
+peaks_nkke_410 <- assess_peaks_sea_input(n, 
                          k = 1,
                          k_e = 0,
                          a, 
                          p,
-                         change = 1,
+                         change = 2,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k1_ke0,
+                         scapes_nkke_410,
                          scape_reps = 200, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
                          max_steps)
 
-peaks_nkke_411 <- assess_peaks_sea(n, 
+peaks_nkke_411 <- assess_peaks_sea_input(n, 
                          k = 1,
                          k_e = 1,
                          a, 
                          p,
-                         change = 1,
+                         change = 2,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k1_ke1,
+                         scapes_nkke_411,
                          scape_reps, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
                          max_steps)
 
-peaks_nkke_412 <- assess_peaks_sea(n, 
+peaks_nkke_412 <- assess_peaks_sea_input(n, 
                          k = 1,
                          k_e = 2,
                          a, 
                          p,
-                         change = 1,
+                         change = 2,
                          lambda_change,
                          env_tot,
                          IM_seas = IM_sea_k1_ke2,
+                         scapes_nkke_412,
                          scape_reps = 200, 
-                         fitness_contrib, 
-                         fitness_calculation,
-                         fit_mean, 
-                         fit_sd, 
                          walk_reps, 
                          walk_type, 
                          walk_start, 

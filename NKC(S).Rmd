@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
 ```
 
-### Set up workspace
+# Set up workspace
 ```{r libraries}
 
 library(gtools) # permutations to get all possible genotype combinations
@@ -20,7 +20,7 @@ library(dplyr) # for constructing the data sets
 
 ```
 
-### (A) The NKC(S) model
+# (A) The NKC(S) model
 code for NK model based on explanations from Welch & Waxman (2005) and supported by python code from Maciej Workiewicz (https://github.com/Mac13kW/NK_model)
 the NK model was introduced by Kauffman & Weinberger (1989) and the NKC(S) model was introduced by Kauffman & Johnson (1991)
 
@@ -41,7 +41,7 @@ IM = interaction matrix; determines how the loci are linked epistatically
 the fitness contribution of a locus i depends on the allelic value itself (position i) and the allelic values at k other loci; the interaction matrix defines *which* loci are epistatically connected
 here I define functions for different types of interaction matrices
 
-# 2.1) random matrix
+### 2.1) random matrix
 any locus can be influenced by any locus - interactions are not necessarily reciprocal
 
 ```{r random interaction matrix}
@@ -85,7 +85,7 @@ IM_random_c <- function(n, c){
 }
 ```
 
-# 2.2) modular matrix
+### 2.2) modular matrix
 epistatic connections are arranged in blocks of k+1 reciprocally interacting loci ("block-diagonal" matrix);
 n needs to be divisible by k+1
 
@@ -145,7 +145,7 @@ IM_modular_c <- function(n, c){
 }
 ```
 
-# 2.3) Nearest neighbour 
+### 2.3) Nearest neighbour 
 the genome is circular and each locus reciprocally interacts with its k neighbours ("local" interactions); 
 k needs to be divisible by 2 for symmetry reasons -> interactions with k/2 neighbours to either side
 
@@ -199,7 +199,7 @@ IM_neighbour <- function(n, k){
 }
 ```
 
-# 2.4) Preferential attachment (Rivkin & Siggelkow, 2007)
+### 2.4) Preferential attachment (Rivkin & Siggelkow, 2007)
 loci that already have many interactions are more likely to add a further interaction than loci that have few interactions; total of n*k interactions among loci
 
 ```{r preferential interaction matrix}
@@ -248,7 +248,7 @@ IM_preferential_c <- function(n, c){
   
 ```
 
-# 2.5) Hierarchical (Rivkin & Siggelkow, 2007)
+### 2.5) Hierarchical (Rivkin & Siggelkow, 2007)
 few loci influence all other loci; the matrix consists of '1's below the diagonal, starting with the ﬁrst column, continuing with the second column, etc., until there are n*k interactions among loci
 
 ```{r hierarchical interaction matrix}
@@ -299,7 +299,7 @@ IM_hierarchical_c <- function(n, c){
 
 ```
 
-# 2.6) Dependent (Rivkin & Siggelkow, 2007)
+### 2.6) Dependent (Rivkin & Siggelkow, 2007)
 few loci are dependent on all other loci
 
 ```{r dependent interaction matrix}
@@ -353,7 +353,7 @@ for (i in n:1){# for each row
 ```
 
 ## 3) Creating the landscape
-# 3.1) generate genotypes
+### 3.1) generate genotypes
 generate all possible genotypes; alleles are encoded by numbers (1, 2, ..., a)
 
 ```{r generate genotypes}
@@ -365,7 +365,7 @@ generate_genotypes <- function(a, n){
 }
 ```
 
-# 3.2) generate fitness contributions
+### 3.2) generate fitness contributions
 a^(k+1+c*s) different allele combinations per locus for each locus
 
 ```{r draw fitness contributions}
@@ -387,7 +387,7 @@ generate_alleles_unif <- function(n, k, a, c, s, fit_min, fit_max){
 }
 ```
 
-# 3.3) Calculate the genotype fitness
+### 3.3) Calculate the genotype fitness
 ```{r calculate genotype fitness}
 
 # fitness calaculation like Kauffman & Weinberger (1989) and Kauffman & Johnson (1991)
@@ -408,7 +408,7 @@ fitness_calc_mult <- function(gene_vector){
 
 ```
 
-# 3.4) Generate intergenomic interaction matrices
+### 3.4) Generate intergenomic interaction matrices
 To automate the generation of the interaction matrices for intergenomic interactions
 ```{r IM_c}
 
@@ -472,7 +472,7 @@ build_IMc <- function(IM = c("R", "M", "P", "H", "D"), # type of matrix
 
 ```
 
-# 3.4) Generate intragenomic interaction matrices
+### 3.4) Generate intragenomic interaction matrices
 ```{r IM_k}
 
 build_IMk <- function(IM = c("R", "M", "N", "P", "H", "D"),
@@ -525,7 +525,7 @@ build_IMk <- function(IM = c("R", "M", "N", "P", "H", "D"),
 
 ```
 
-# 3.5) Generate NKC(S) landscape
+### 3.5) Generate NKC(S) landscape
 ```{r generate landscape}
 build_landscape <- function(IM_k, # intragenomic epistasis matrices
                             IM_c, # intergenomic epistasis matrices
@@ -656,7 +656,7 @@ build_landscape <- function(IM_k, # intragenomic epistasis matrices
 ```
 
 ## 4) Exploring the landscape topology
-# 4.1) Find neighbors one step away
+### 4.1) Find neighbors one step away
 This will include mutations that can happen within a focal species genome but also mutations that can happen in the genome of one of the interacting species
 
 ```{r neighbour search}
@@ -691,7 +691,7 @@ findNeighbours <- function(landscape,
 }
 ```
 
-# 4.2) visualise the landscape
+### 4.2) visualise the landscape
 
 ```{r landscape visualisation}
 visual_landscape <- function(landscape, n, c, s) {
@@ -1373,7 +1373,7 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 
 ````
 
-# 8) test runs
+## 8) test runs
 ```{r test landscape}
 
 # set.seed(1313)
@@ -1435,7 +1435,7 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 ```
 
 
-### (B) NKsea model (NK seascapes)
+# (B) NKsea model (NK seascapes)
 In order to have a comparison for multidimensional fitness mappings and have an abiotic equivalent to dynamic environments created by the species interactions, we implement a seascapes equivalent repurposing the NKC functions 
 
 Let's imagine we create a s*n seascape equivalent to the NKC model, to start off we can imagine that n loci are relevant for each abiotic environment (essentially each of s_tot species is translated into a different abiotic environment). We can reinterpret the K from the NKC model as genetic interactions between loci relevant for a given abiotic environment and C as genetic interactions between loci relevant for different abiotic environments. Additionally, we could toggle the pleiotropy in the system by changing the number of loci that contribute to environment-specific fitness (but note that this is not actually implemented here... yet!)
@@ -1456,7 +1456,7 @@ IM = interaction matrix; determines how the loci are linked epistatically
 
 
 ## 2) Creating the landscapes
-# 2.1) Generate seascapes
+### 2.1) Generate seascapes
 ```{r NK seascapes}
 build_seascape <- function(IM_sea, # seascape intercation matrix
                             fitness_contrib = c("N", "U"), # way to draw fitness contributions (normal vs. uniform distribution)
@@ -1593,6 +1593,58 @@ build_seascape <- function(IM_sea, # seascape intercation matrix
 }
 
 ```
+
+### 2.2) Turn NKC landscapes to NK seascape
+For the ultimate comparison of dynamic fitness landscapes, I take the NKC landcsapes for two species and turn them into a single species seascape with two environment-associated traits
+````{r}
+
+NKC_to_NKsea <- function(landscape_list, # NKC landscapes to transform; stored as list with landscapes[[k_rep]][[c_rep]][[scape_rep]][[species]]
+                         env_tot, # total number of environments (previously species)
+                         k_reps = 1, # for the NKC model I only use on type of IM_K at a time (for now...); if there are more I need to change thow I iterate over these
+                         c_reps,
+                         scape_reps,
+                         n){
+  
+  seascape_list <- list()
+  
+  
+  for (k_rep in 1:k_reps){
+    
+    for (c_rep in 1:c_reps){
+      
+      seascape_list[[c_rep]] <- list() # right now the number of IM_cs is equal to seascape interaction matrices... but as mentioned above this does not have to be true 
+      
+      for (scape_rep in 1:scape_reps){
+        
+          seascape_list[[c_rep]][[scape_rep]] <- landscape_list[[k_rep]][[c_rep]][[scape_rep]][[1]][, c(1:(n*env_tot), (n*(env_tot+1)+1), (n*(env_tot+1)+2))]
+          colnames(seascape_list[[c_rep]][[scape_rep]])[c((n*(env_tot)+1), (n*(env_tot)+2))] <- c("E1.fitness", "E1.rank")
+          
+          for (species in 2:env_tot) {
+            
+            temp_landscape <-  landscape_list[[k_rep]][[c_rep]][[scape_rep]][[species]]
+            temp_landscape <- temp_landscape[with(temp_landscape, order(P.1, P.2, F.1, F.2)), ] # reordering the loci, so they are in the same order as for sp 1; needs to be adjusted for more species and or loci; but doing this quick and dirty for now OB-)
+            colnames(temp_landscape)[c((n*(env_tot+1)+1), (n*(env_tot+1)+2))] <- c("E2.fitness", "E2.rank")
+            
+            seascape_list[[c_rep]][[scape_rep]] <- cbind(seascape_list[[c_rep]][[scape_rep]], temp_landscape[, c("E2.fitness", "E2.rank")])
+            
+            
+          }
+          
+          
+        }
+        
+      }
+      
+      
+      
+  }
+  
+ return(seascape_list) # list of translated seascapes    
+    
+  }
+
+
+````
 
 ## 3) Adaptive walks on seascape = adaptive voyage?
 ````{r adaptive voyage}
