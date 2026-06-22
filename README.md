@@ -1,13 +1,13 @@
 # Loraine-NKCS
-Loraine's code of the NKCS model in R - 09.06.2026
+Loraine's code of the NKCS model in R - 22.06.2026
 
-The code is based on the explanation of the NK model in Welch & Waxman (2005) + I used some code collected at https://www.cs.unibo.it/~fioretti/CODE/NK/ to help me implement the NKC model. Additionally, the code contains a seascapes implementation of the NK model, where the shape of the fitness landscape can change across abiotic environments (= abiotic equivalent of dynamic fitness landscapes to compare to biotically dynamic NKC landscapes).
+The code is based on the explanation of the NK model in Welch & Waxman (2005) + I used some code collected at https://www.cs.unibo.it/~fioretti/CODE/NK/ to help me implement the NKC model. Additionally, the code contains a seascapes implementation of the NK model, where the fitness of a species can differ across abiotic environments (= abiotic equivalent of dynamic fitness landscapes to compare to biotically dynamic NKC landscapes).
 
 The NKCS model was originally introduced by Kauffman & Johnsen (1991)
 
 This code was used to generate the results in "Repeatability of adaptation in interacting species" by Hablützel, MacPherson & Bank (see preprint: https://doi.org/10.64898/2026.04.01.715933)
 
 This folder contains the following R markdown files:
-- NKC(S).Rmd - the file that includes all the code to build the model (note that I've only tested it for fully symmetric 2-species communities)
+- NKC(S).Rmd - the file that includes all the code to build the models (note that I've only tested it for fully symmetric 2-species communities)
 - NKC_simulations.Rmd - code to run the simulations
 - NKC_exploration.Rmd - code for additional analysis and to generate plots
