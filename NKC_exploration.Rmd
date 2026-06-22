@@ -36,7 +36,7 @@ library(glmmTMB) # for mixed effect models
 source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # to get the landscape visualisation functions for example
 
 # load data of simulations
-load("peaks_total7") 
+load("NKC_landscapes") 
 load("seascapes")
 
 ```
@@ -255,6 +255,154 @@ ggsave(path = "../Figures/",
 
 
 ```
+
+## Calculate metrics of repeatability
+```{r}
+entropy_df_random <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
+                                       peaks_total_ranked_summarised$walking == "random",]
+
+entropy_df_random[is.na(entropy_df_random$prop_rank_peaked), "prop_rank_peaked"] <- entropy_df_random[is.na(entropy_df_random$prop_rank_peaked), "prop_cycle"]
+entropy_df_random$landscape_ID <- interaction(entropy_df_random$n, entropy_df_random$k, entropy_df_random$c, entropy_df_random$c_rep, entropy_df_random$scape_rep)
+
+entropy_df_random$entropy <- NA
+entropy_df_random$most_freq <- NA
+entropy_df_random$prob_same <- NA
+entropy_df_random$prob_global <- NA
+
+for (ID in unique(entropy_df_random$landscape_ID)) {
+  
+  for (i in 1:2) {
+    
+    temp_df <- entropy_df_random[entropy_df_random$landscape_ID == ID & entropy_df_random$species == i,]
+    entropy <- NULL
+    
+    for (j in 1:nrow(temp_df)) {
+      
+      entropy <- c(entropy, (temp_df[j, "prop_rank_peaked"]*log2(temp_df[j, "prop_rank_peaked"])))
+      
+    }
+    
+    entropy_df_random[entropy_df_random$landscape_ID == ID & entropy_df_random$species == i, "entropy"] <- sum(-entropy)
+    entropy_df_random[entropy_df_random$landscape_ID == ID & entropy_df_random$species == i, "most_freq"] <- max(temp_df[, "prop_rank_peaked"])
+    entropy_df_random[entropy_df_random$landscape_ID == ID & entropy_df_random$species == i, "prob_same"] <- sum(temp_df[, "prop_rank_peaked"]^2)
+    entropy_df_random[entropy_df_random$landscape_ID == ID & entropy_df_random$species == i, "prob_global"] <- sum(temp_df[temp_df$rank == 1, "prop_rank_peaked"]^2)
+  }
+  
+}
+
+# entropy
+entropy_fig <- ggplot(entropy_df_random,
+       aes(x = species,
+           y = entropy,
+           group = species)) +
+  geom_violin(col = "grey45") +
+  geom_jitter(col = "forestgreen",
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("F", "P"), 
+                     breaks = c(1,2),
+                   name = "Species",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Shannon entropy",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
+  fig_theme
+
+most_freq_fig <- ggplot(entropy_df_random,
+       aes(x = species,
+           y = most_freq,
+           group = species)) +
+  geom_violin(col = "grey45") +
+  geom_jitter(col = "forestgreen",
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("F", "P"), 
+                     breaks = c(1,2),
+                   name = "Species",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Prop. of most frequent outcome",
+                     limits = c(0,1.05),
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
+  fig_theme
+
+prob_same_fig <- ggplot(entropy_df_random,
+       aes(x = species,
+           y = prob_same,
+           group = species)) +
+  geom_violin(col = "grey45") +
+  geom_jitter(col = "forestgreen",
+              size = 2.5,
+              height = 0.01,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  theme_bw() +
+  facet_grid(c ~ k) +
+  scale_x_continuous(labels = c("F", "P"), 
+                     breaks = c(1,2),
+                   name = "Species",
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
+                                       breaks = NULL, labels = NULL)) +
+  scale_y_continuous(name = "Prob. of reaching the same peak",
+                     limits = c(0,1.05),
+                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
+                                       breaks = NULL, labels = NULL)) +
+  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
+        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
+  fig_theme
+
+
+repeatability_metrics <- ggarrange(no_outcomes, entropy_fig, most_freq_fig, prob_same_fig)
+
+# save the figure
+ggsave(path = "../Figures/Revisions",
+       device = cairo_pdf, # to save pdf with unicode character
+       units = c("cm"),
+       width = 35,
+       height = 26,
+       filename = "repeatability_metrics.pdf",
+       plot = repeatability_metrics)
+```
+
+
 
 ## Fig 4a - Repeatability N = 2
 This is the first results figure that shows how many adaptive walks lead to the same outcome on each of our fitness landscape replicates. Here we see the number of realised outcomes of adaptation as well as how often they are repeated on the same landscape
@@ -1988,7 +2136,7 @@ ggsave(path = "../Figures/",
 
 ```
 
-## Assessing the number of outcomes
+## number of outcomes
 ```{r}
 # how many outcomes are there on the same landscape?
 true_only_summed2 <- as.data.frame(peaks_total_ranked2_summarised |> 
@@ -2066,7 +2214,7 @@ no_outcomes <- ggplot(no_outcomes_df,
                size = 3,
                col = "black") +
   scale_y_continuous(name = "Outcomes/landscape",
-                     limits = c(0,8),
+                     limits = c(1,8),
                      breaks = c(1:8)) +
    scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
                             "1.0.2" = "2-1-0",
@@ -3386,7 +3534,7 @@ ggsave(path = "../Figures/",
 ```
 
 
-## cycle summary stats
+# steps in adaptive walks
 ```{r}
 
 # steps in adaptive walk
@@ -3445,7 +3593,10 @@ ggsave(path = "../Figures/",
        height = 17,
        filename = "walks_steps.pdf",
        plot = walks_steps)
+```
 
+## cycle summary stats
+```{r}
 # size of cycles
 cycle_size <- ggplot(cycles_df,
        aes(y = nb_in_cycle_sp1,
@@ -3556,7 +3707,6 @@ ggplot(peaks_total_ranked2_summarised[!is.na(peaks_total_ranked2_summarised$corr
 # R^2 representation
 ```{r}
 
-
 # recoding fitness landscapes; 
 ## in my model the alleles are encoded as 1 and 2, but I would different alleles for the two species to better distinguish them (differences in metagenotypes should be easier to spot this way)
 
@@ -3590,12 +3740,10 @@ seascape_Rsqrd <- ggplot(visual_sea_df,
            y = E2.rank)) +
   geom_line(data = visual_sea_df[visual_sea_df$mut == "intra",],
             aes(group = group,
-                linetype = mut,
                 col = gen_E2),
             linewidth = 0.75) +
   geom_line(data = visual_sea_df[visual_sea_df$mut == "inter",],
-            aes(group = group,
-                linetype = mut),
+            aes(group = group),
             col = "grey",
             linewidth = 0.5) +
   geom_label(label = visual_sea_df$seq,
@@ -3617,22 +3765,28 @@ seascape_Rsqrd <- ggplot(visual_sea_df,
 
 ```
 
+# overview plot
 ```{r}
 
-localrep_sea4 <- ggplot(peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$walking == "random",], # only random walks in main text
+peaks_sea_ranked_melted <- melt(peaks_sea_ranked_summarised[, c("k", "k_e", "sea_rep", "scape_rep", "walking", "prop_rank_peaked", "prop_cycle", "E1.rank", "E2.rank")],
+                                id.vars = c("k", "k_e", "sea_rep", "scape_rep", "walking", "prop_rank_peaked", "prop_cycle"),
+                                variable.name = "rank")
+
+
+localrep_sea4 <- ggplot(peaks_sea_ranked_melted[peaks_sea_ranked_melted$walking == "random",], # only random walks in main text
         aes(y = prop_rank_peaked, # plot proportions
-            x = E1.rank,
-            group = E1.rank)) +
+            x = value,
+            group = value)) +
   geom_violin(col = "grey45") +
   geom_violin(aes(y = prop_cycle, # I counted the cycles separately in the data frame, so we will handle them separately as well
-                  x = E1.rank),
+                  x = value),
               col = "grey45") +
   geom_jitter(col = "forestgreen", # for equilibrium points
               size = 2.5,
               height = 0.01,
               alpha = 0.3) +
   geom_jitter(aes(y = prop_cycle,
-                  x = E1.rank),
+                  x = value),
                col = "skyblue", # for cycling points
               size = 2.5,
               height = 0.01,
@@ -3647,13 +3801,13 @@ localrep_sea4 <- ggplot(peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$
                size = 3,
                col = "black") +
   stat_summary(aes(y = prop_cycle, # adds the mean proportion of cycling/landscape
-                  x = E1.rank),
+                  x = value),
                fun = mean,
                geom = "crossbar",
                linewidth = 0.4,
                col = "black") +
   stat_summary(aes(y = prop_cycle, # adds the median proportion of cycling/landscape
-                  x = E1.rank),
+                  x = value),
                fun = median,
                geom = "point",
                shape = 18,
@@ -3673,4 +3827,64 @@ localrep_sea4 <- ggplot(peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$
         text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
   fig_theme
 
+```
+
+# steps in adaptive walks
+```{r}
+
+# steps in adaptive walk
+ggplot(peaks_total_sea[peaks_total_sea$walking == "random",],
+       aes(x = interaction(k, k_e, n),
+           y = step)) +
+  geom_jitter(col = "forestgreen",
+              alpha = 0.6,
+              size = 2.5) +
+  scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-K_e") +
+  ylab("Steps in adaptive walk") +
+  theme_bw() +
+  fig_theme
+
+
+walks_steps <- ggplot(peaks_total[peaks_total$species == 1,], # to reduce redundancy - only one point per simulation
+       aes(x = interaction(k, c, n),
+           y = step)) +
+  geom_jitter(aes(col = walking),
+              alpha = 0.5,
+              size = 2.5) +
+  scale_color_manual(values=c("grey60", "grey", "forestgreen")) +
+  facet_grid(walking~.,
+             labeller = labeller(walking = 
+    c("greedy" = "greedy",
+      "prop" = "true",
+      "random" = "random"))) +
+  scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-C") +
+  ylab("Steps in adaptive walk") +
+  theme_bw() +
+  theme(strip.text.y.right = element_text(angle = 90)) +
+  fig_theme
+
+ggsave(path = "../Figures/",
+       units = c("cm"),
+       width = 19,
+       height = 17,
+       filename = "walks_steps.pdf",
+       plot = walks_steps)
 ```

@@ -20,7 +20,7 @@ library(dplyr) # for constructing the data sets
 
 ```
 
-### A) The NKC(S) model
+### (A) The NKC(S) model
 code for NK model based on explanations from Welch & Waxman (2005) and supported by python code from Maciej Workiewicz (https://github.com/Mac13kW/NK_model)
 the NK model was introduced by Kauffman & Weinberger (1989) and the NKC(S) model was introduced by Kauffman & Johnson (1991)
 
@@ -1215,6 +1215,7 @@ for (k_rep in 1:IM_k_reps) {
                                                                                                                                               a,
                                                                                                                                               c,
                                                                                                                                               s,
+                                                                                                                                              R, 
                                                                                                                                               walk_start,
                                                                                                                                               walking,
                                                                                                                                               start_seq,
@@ -1270,7 +1271,7 @@ assess_peaks_R_input <- function(n, # nb. of loci
 
 # for each combination of IM_k and IM_c make the landscapes and perform the random walks
 total_walks <- list()
-scapes_replicated <- landscapes
+scapes_replicated <- landscapes # to store the landscapes
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
 total_walks[[IM_k_reps]] <- list()
@@ -1278,8 +1279,12 @@ total_walks[[IM_k_reps]][[IM_c_reps]] <- list()
 
 for (k_rep in 1:IM_k_reps) {
   
-  for (c_rep in 1:IM_c_reps){
+  IM_k <- IM_ks[[k_rep]]
   
+  for (c_rep in 1:IM_c_reps){
+    
+    IM_c <- IM_cs[[c_rep]]
+    
     # create the landscapes
   for (scape_rep in 1:scape_reps) {
     
@@ -1306,7 +1311,7 @@ for (k_rep in 1:IM_k_reps) {
         
         desired_start <- start_seqs[[walk_rep %% length(start_seqs) + 1]]
           
-        }
+      }
       
       walks_replicated[[walk_rep]] <- adaptive_walk_R(scapes_replicated[[k_rep]][[c_rep]][[scape_rep]], 
               walk = walking,
@@ -1316,6 +1321,7 @@ for (k_rep in 1:IM_k_reps) {
               s_tot, 
               IM_c,
               R,
+              lambda_R,
               start = walk_start,
               desired_start,
               max_steps)
@@ -1336,6 +1342,7 @@ for (k_rep in 1:IM_k_reps) {
                                                                                                                                               a,
                                                                                                                                               c,
                                                                                                                                               s,
+                                                                                                                                              R,
                                                                                                                                               walk_start,
                                                                                                                                               walking,
                                                                                                                                               start_seq,
@@ -1428,10 +1435,10 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 ```
 
 
-### B) NKsea model (NK seascapes)
+### (B) NKsea model (NK seascapes)
 In order to have a comparison for multidimensional fitness mappings and have an abiotic equivalent to dynamic environments created by the species interactions, we implement a seascapes equivalent repurposing the NKC functions 
 
-Let's imagine we create a s*n seascape equivalent to the NKC model, to start off we can imagine that n loci ar relevant for each abiotic environment (essentially each of s_tot species is trandslated into a different abiotic environment). We can reinterpret the K from the NKC model as genetic interactions between loci relevant for a given abiotic environment and C as genetic interactions between loci relevant for different abiotic environments. Additionally, we can toggle the pleiotropy in the system by changing the number of loci that contribute to environment-specific fitness
+Let's imagine we create a s*n seascape equivalent to the NKC model, to start off we can imagine that n loci are relevant for each abiotic environment (essentially each of s_tot species is translated into a different abiotic environment). We can reinterpret the K from the NKC model as genetic interactions between loci relevant for a given abiotic environment and C as genetic interactions between loci relevant for different abiotic environments. Additionally, we could toggle the pleiotropy in the system by changing the number of loci that contribute to environment-specific fitness (but note that this is not actually implemented here... yet!)
 
 ## 1) Variable explanations
 n = baseline nb. of haploid loci contributing to environment-specific fitness
@@ -1782,7 +1789,7 @@ assess_peaks_sea <- function(n, # nb. of loci
  
 # for each combination of IM_k and IM_c make the landscapes and perform the random walks
 total_walks <- list()
-scapes_replicated <- list() # to store the landscapes
+scapes_replicated <- list()
 
 peaks_df <- NULL #I want to save the endpoints of all walks in one df
 total_walks[[IM_sea_reps]] <- list()
@@ -1854,6 +1861,117 @@ for (sea_rep in 1:IM_sea_reps) {
                                                                                                                                               k,
                                                                                                                                               k_e,
                                                                                                                                               a,
+                                                                                                                                              env_tot,
+                                                                                                                                              walk_start,
+                                                                                                                                              walking,
+                                                                                                                                              start_seq,
+                                                                                                                                              global_peak_E1 = global_peaks[[1]],
+                                                                                                                                              global_peak_E2 = global_peaks[[2]])))
+        
+      
+      
+    }
+    
+    total_walks[[sea_rep]][[scape_rep]][[match(walking, walk_type)]] <- walks_replicated # store adaptive walk for each landscape replicate for the different types of adaptive walk
+    
+    }
+    
+  }
+  
+}
+
+return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
+            IM_seas, # interaction matrices 
+            scapes_replicated, # all the fitness landscapes
+            total_walks)) # the individual adaptive walks
+
+}
+
+## if I want to rerun simulations on already existing fitness seascapes:
+assess_peaks_sea_input <- function(n, # nb. of loci
+                         k, # nb of interacting loci within an environment
+                           k_e, # nb of interacting loci between environments
+                         a, # nb. of alleles at each locus
+                         p, # pleiotropic loci - not implemented yet
+                         change, # "rounds of mutation" spent in the same abiotic environment (rate of envrionmental change)
+                          lambda_change, # if change = NA -> lambda of Poisson distribution
+                         env_tot, # total number of environments in the system
+                         IM_seas, # interaction matrix
+                         seascapes, # input the seascapes to perform adaptive walks on
+                         scape_reps, # nb. of replicates to generate fitness landscapes for each combination of IM_k and IM_c
+                         walk_reps, # nb. of replicates of adaptive walks on a given landscape
+                         walk_type, # vector of types of adaptive walks (random, greedy, prop)
+                         walk_start, # starting genotype of adaptive walk (random, starting at reference type/WT, or starting at a specified sequence)
+                         start_seqs, # if I want to specify where the adaptive walk starts -> supplied as a list
+                         max_steps) # max nb. of steps in adaptive walk
+{
+  
+  env <- env_tot # for now assuming a species experiences every abiotic environment in the system
+
+# get number of replicates for interaction matrix
+  IM_sea_reps <- length(IM_seas)
+ 
+# for each combination of IM_k and IM_c make the landscapes and perform the random walks
+total_walks <- list()
+scapes_replicated <- seascapes # we are importing the landscapes we want to use
+
+peaks_df <- NULL #I want to save the endpoints of all walks in one df
+total_walks[[IM_sea_reps]] <- list()
+
+for (sea_rep in 1:IM_sea_reps) {
+  
+  IM_sea <- IM_seas[[sea_rep]]
+  
+    # create the landscapes
+  for (scape_rep in 1:scape_reps) {
+
+    # identify the global fitness peak for each landscape
+    global_peaks <- list()
+    
+    for (e in 1:env_tot){
+      
+      global_peaks[[e]] <-  max(scapes_replicated[[sea_rep]][[scape_rep]][, paste0("E", e, ".fitness")])
+      
+    }
+    
+    # for each landscape perform the adaptive walks
+    total_walks[[sea_rep]][[scape_rep]] <- list()
+    
+    for (walking in walk_type) { # perform different types of adaptive walks for the same landscape to have the direct comparison e.g. random walk vs greedy walk
+
+    walks_replicated <- list()
+    
+    # perform the walk
+    for (walk_rep in 1:walk_reps) {
+      
+      if (walk_start == "S"){
+        
+        desired_start <- start_seqs[[walk_rep %% length(start_seqs) + 1]]
+          
+      }
+      
+      walks_replicated[[walk_rep]] <- adaptive_walk_sea(scapes_replicated[[sea_rep]][[scape_rep]], 
+              walk = walking,
+              n,
+              env_tot, 
+              change,
+              lambda_change,
+              start = walk_start,
+              desired_start,
+              max_steps)
+      
+      # store the desired information (endpoint of walk and simulation parameters)
+      start_seq <- paste(walks_replicated[[walk_rep]][1, c(1:(n*env_tot))], collapse = "") # I want to save the starting point of each adaptive walk
+        
+        # and then keep track of the end points of each walk here; I am saving the end point of the walk alongside the simulation parameters
+        peaks_df <- rbind(peaks_df, cbind(walks_replicated[[walk_rep]][nrow(walks_replicated[[walk_rep]]),], data.frame(sea_rep,
+                                                                                                                                              scape_rep, 
+                                                                                                                                              walk_rep, 
+                                                                                                                                              n,
+                                                                                                                                              k,
+                                                                                                                                              k_e,
+                                                                                                                                              a,
+                                                                                                                        change,
                                                                                                                                               env_tot,
                                                                                                                                               walk_start,
                                                                                                                                               walking,
