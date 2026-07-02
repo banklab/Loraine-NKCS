@@ -3,10 +3,11 @@ title: "NKC_exploration"
 output: html_notebook
 ---
 
-Loraine Hablützel - 25.06.2026
+Loraine Hablützel - 02.07.2026
 
 This is the code used to produce all figures in the manuscript "Repeatability of adaptation in interacting" species; note that in the code I refer to species as "species 1" and "species 2" and that alleles are encoded as 1s (reference/WT allele) and 2s (mutant/alternate allele).
 
+This document is divided into three parts - (i) code that goes towards the figures used in the main text of the manuscript, (ii) code for supplementary figures, and (iii) the graveyard of figures that didn't make it into the manuscript but could still be interesting for exploring the data further (e.g., alternative visualisation of the fitness landscapes and some explorations of the adaptive walks). The different code chunks will either be directly for plot creation ("Fig."; should be indicated and corresponding with manuscript), or analysis/data manipulation inserts (">").
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -15,6 +16,21 @@ knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_sc
 ```
 
 # Set up workspace
+All the packages and data that need to be loaded; the data sets I have to start off the analysis are:
+- peaks_total -> summary output of every single replicate walk on every replicate landscape
+- peaks_total_R -> summary output of every single replicate walk on every replicate landscape for R = 2
+- peaks_summarised -> this is for exploratory plotting; I grouped the results by how many species reach the global fitness peak
+- peaks_summarised_cycles -> this is for exploratory plotting; I grouped the results by how often cycling occurs
+- peaks_total_ranked_summarised -> endpoints grouped by how often they occur
+- peaks_total_ranked_summarised_R -> endpoints grouped by how often they occur for R = 2
+- peaks_total_ranked2_summarised -> endpoints grouped by how often they occur; both species combined and only for random adaptive walks
+- peaks_total_ranked2_summarised_R -> endpoints grouped by how often they occur; both species combined and only for random adaptive walks for asymmetric mutation rates
+
+- peaks_total_sea -> summary output of every single replicate walk on every replicate seascape
+- peaks_total_sea_R -> summary output of every single replicate walk on every replicate seascape for asymmetrical environmental change
+- peaks_sea_ranked_summarised -> endpoints grouped by how often they occur; both environments combined into one dataframe
+- peaks_sea_ranked_summarised_R -> endpoints grouped by how often they occur; both environments combined into one dataframe for asymmetrical environmental change
+     
 ```{r libraries}
 rm (list = ls()) # clear environment
 
@@ -48,6 +64,7 @@ load("seascapes")
 ```
 
 ## Theme
+Shortcut for some aspects that I am keeping identical across plots
 ```{r}
 # main theme for all my figures
 fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
@@ -59,6 +76,7 @@ fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
                    panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
         panel.grid.major.x = element_blank(),
+        text = element_text(family = "Atkinson Hyperlegible Next")
         )
 
 #capabilities("cairo") # I think this was to check whether I could save my pdfs with a special unicode character; but I no longer remember... sorry :-(
@@ -66,15 +84,15 @@ fig_theme <- theme(axis.text.x.bottom = element_text(size=16),
 ```
 
 
-# 1.) Plots for manuscript
+# (i) Plots for manuscript
 
 ## Fig. 3 - fitness landscape example; R^2 version
-This figure shows us the two-dimensional fitness mapping for all the metagenotypes in a community -> each metagenotype can correspond to a different fitness rank for the two species
+This figure shows us the two-dimensional fitness mapping for all the metagenotypes in a community (i.e., all possible genotype combinations between the species) -> each metagenotype can correspond to a different fitness rank for the two species
 ```{r}
 # recoding fitness landscapes; 
 ## in my model the alleles are encoded as 1 and 2, but I would different alleles for the two species to better distinguish them (differences in metagenotypes should be easier to spot this way)
 
-scape_sp1 <- peaks_nkcs_2111[[4]][[1]][[2]][[13]][[1]] # take desired landscape replicate for species 1 = "focal species"
+scape_sp1 <- peaks_nkcs_2111[[4]][[1]][[2]][[35]][[1]] # take desired landscape replicate for species 1 = "focal species"
 
 # recode alleles for focal species 
 scape_sp1[scape_sp1$F.1 == 1, "F.1"] <- "a" 
@@ -265,14 +283,30 @@ ggsave(path = "../Figures/",
 
 ```
 
-## Calculate metrics of repeatability
-```{r}
+## > Calculate metrics of repeatability
+In this section I take my data on all observed adaptive outcomes and calculate several metrics of repeatability - (i) number of adaptive outcomes per species on a landscape, (ii) Shannon entropy (number of outcomes considering their individual probabilities), (iii) frequency of the most common outcome, and (iv) the probability of reaching the same outcome twice. I also look at which adaptive outcomes are the most common on a given landscape. 
+This chunk gives following output:
+- entropy_stats_df -> repeatability metrics for each unique landscape; multiple entries if there is a tie between multiple outcomes as most coommon outcomes
+- entropy_stats_df_final -> repeatability metrics for each unique landscape; each landscape only once
+
+### > repeatability of NKC model
+````{r}
+## number of outcomes/landscape
+peaks_total_ranked_summarised$landscape_ID <- interaction(peaks_total_ranked_summarised$n, peaks_total_ranked_summarised$k, peaks_total_ranked_summarised$c, peaks_total_ranked_summarised$c_rep, peaks_total_ranked_summarised$scape_rep)
+
+random_only_summed <- as.data.frame(peaks_total_ranked_summarised |> 
+                            dplyr::group_by(k, c, n, c_rep, k_rep, landscape_ID, species, walking) |>
+                            dplyr::summarise(outcomes = n())) 
+
+## other repeatability metrics
+# I only calculate this for random walks
 entropy_df_random <- peaks_total_ranked_summarised[peaks_total_ranked_summarised$n == 2 &
                                        peaks_total_ranked_summarised$walking == "random",]
 
 entropy_df_random[is.na(entropy_df_random$prop_rank_peaked), "prop_rank_peaked"] <- entropy_df_random[is.na(entropy_df_random$prop_rank_peaked), "prop_cycle"] # correct for the fact I kept track of cycle and equilibrium proportions separately
-entropy_df_random$landscape_ID <- interaction(entropy_df_random$n, entropy_df_random$k, entropy_df_random$c, entropy_df_random$c_rep, entropy_df_random$scape_rep)
+entropy_df_random$landscape_ID <- interaction(entropy_df_random$n, entropy_df_random$k, entropy_df_random$c, entropy_df_random$c_rep, entropy_df_random$scape_rep) # add landscape IDs
 
+# prep the dataframe
 entropy_stats_df <- NULL
 
 for (ID in unique(entropy_df_random$landscape_ID)) { # for each unique landscape
@@ -308,7 +342,7 @@ for (ID in unique(entropy_df_random$landscape_ID)) { # for each unique landscape
                              prob_same = sum(temp_df[, "prop_rank_peaked"]^2),
                              most_common_rank = most_common_rank, # ties will result in multiple entry of the same landscape in the table
                              species = i,
-                             tie = tie)
+                             tie = tie) # I want to know whether there was a tie or not for plotting later on
     
     entropy_stats_df <- rbind(entropy_stats_df, stats_temp)
   
@@ -317,9 +351,83 @@ for (ID in unique(entropy_df_random$landscape_ID)) { # for each unique landscape
   
 }
 
-# entropy
-entropy_stats_df_final <- dplyr::distinct(entropy_stats_df, landscape_ID, .keep_all = TRUE) # each landscape once
+entropy_stats_df_final <- dplyr::distinct(entropy_stats_df, landscape_ID, .keep_all = TRUE) # each landscape only once (avoid overrepresentation when plotting entropy etc.)
 
+#### I recode the ranks ranks to shift everything on the same scale (e.g., when C = 0, there are only 4 distinct fitness ranks for a species -> I shift the ranks so they cover the same scale as the 16 unique ranks possible on landscapes with C > 0)
+
+entropy_stats_df$re_rank <- entropy_stats_df$most_common_rank
+
+entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 1, "re_rank"] <- 1
+entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 2, "re_rank"] <- 5
+entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 3, "re_rank"] <- 9
+entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 4, "re_rank"] <- 13
+
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 2 & entropy_stats_df$c_rep == 1, "re_rank"] <- 3
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 3 & entropy_stats_df$c_rep == 1, "re_rank"] <- 5
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 4 & entropy_stats_df$c_rep == 1, "re_rank"] <- 7
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 5 & entropy_stats_df$c_rep == 1, "re_rank"] <- 9
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 6 & entropy_stats_df$c_rep == 1, "re_rank"] <- 11
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 7 & entropy_stats_df$c_rep == 1, "re_rank"] <- 13
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 8 & entropy_stats_df$c_rep == 1, "re_rank"] <- 15
+
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 2 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 3
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 3 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 5
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 4 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 7
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 5 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 9
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 6 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 11
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 7 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 13
+entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 8 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 15
+
+# add quartiles
+entropy_stats_df$Q <- NA
+entropy_stats_df[entropy_stats_df$re_rank %in% 1:4, "Q"] <- "Q1"
+entropy_stats_df[entropy_stats_df$re_rank %in% 5:8, "Q"] <- "Q2"
+entropy_stats_df[entropy_stats_df$re_rank %in% 9:12, "Q"] <- "Q3"
+entropy_stats_df[entropy_stats_df$re_rank %in% 13:16, "Q"] <- "Q4"
+
+````
+
+### Fig. no. outcomes/landscape
+````{r}
+no_outcomes <- ggplot(random_only_summed[random_only_summed$walking == "random",],
+       aes(y = outcomes,
+           x = interaction(k,c,n),
+           group = interaction(k,c,n))) +
+  geom_violin() +
+  geom_jitter(col = "forestgreen", # for equilibrium points
+              size = 2.5,
+              height = 0.1,
+              alpha = 0.3) +
+  stat_summary(fun = mean,
+               geom = "crossbar", # adds the mean proportion for each rank/landscape
+               linewidth = 0.4,
+               col = "black") +
+  stat_summary(fun = median,
+               geom = "point", # adds the median proportion for each rank/landscape
+               shape = 18,
+               size = 3,
+               col = "black") +
+  scale_y_continuous(name = "Outcomes/landscape",
+                     limits = c(1,4.2),
+                     breaks = c(1:4)) +
+   scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
+                            "1.0.2" = "2-1-0",
+                            "0.1.2" = "2-0-1",
+                            "1.1.2" = "2-1-1",
+                            "0.2.2" = "2-0-2",
+                            "1.2.2" = "2-1-2",
+                            "1.0.4" = "4-1-0",
+                            "2.0.4" = "4-2-0",
+                            "3.0.4" = "4-3-0")) +
+  xlab("N-K-C") +
+  theme_bw() +
+  fig_theme
+````
+
+
+### Fig. Entropy
+````{r}
+# entropy
 entropy_fig <- ggplot(entropy_stats_df_final,
        aes(x = interaction(k,c,n),
            y = entropy,
@@ -353,9 +461,10 @@ entropy_fig <- ggplot(entropy_stats_df_final,
         text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
   fig_theme
 
+````
 
-
-#######
+### Fig. most common outcomes
+````{r}
 
 most_common <- ggplot(entropy_stats_df[entropy_stats_df$most_common_rank != 17,],
        aes(x = interaction(k,c,n),
@@ -398,97 +507,10 @@ most_common <- ggplot(entropy_stats_df[entropy_stats_df$most_common_rank != 17,]
   theme(text = element_text(family = "Arial Unicode MS")) +
   fig_theme
 
+````
 
-ggplot(entropy_stats_df[entropy_stats_df$most_common_rank != 17,],
-       aes(x = most_common_rank,
-           y = most_freq,
-           group = most_common_rank)) +
-  geom_jitter(col = "forestgreen", # for equilibrium points
-              aes(shape = as.factor(tie)),
-              size = 2.5,
-              height = 0.01,
-              alpha = 0.2) +
-  geom_jitter(data = entropy_stats_df[entropy_stats_df$most_common_rank == 17,],
-              aes(shape = as.factor(tie)),
-              col = "skyblue", # for cycle points
-              size = 2.5,
-              height = 0.1,
-              alpha = 0.2) +
-  geom_violin(data = entropy_stats_df,
-              fill = "transparent",
-              width = 1) +
-  stat_summary(fun = median,
-               geom = "point", # adds the median proportion for each rank/landscape
-               shape = 18,
-               size = 3,
-               col = "black") +
-  stat_summary(fun = mean,
-               geom = "crossbar", # adds the mean proportion for each rank/landscape
-               linewidth = 0.4,
-               col = "black") +
-  stat_summary(data = entropy_stats_df[entropy_stats_df$most_common_rank == 17,],
-               fun = median,
-               geom = "point", # adds the median proportion for each rank/landscape
-               shape = 18,
-               size = 3,
-               col = "black") +
-  stat_summary(data = entropy_stats_df[entropy_stats_df$most_common_rank == 17,],
-               fun = mean,
-               geom = "crossbar", # adds the mean proportion for each rank/landscape
-               linewidth = 0.4,
-               col = "black") +
-  theme_bw() +
-  facet_grid(c ~ k) +
-  scale_x_continuous(labels = c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "\u21BB"), # the unicode character is not essential and could be replace by "cycle" - I just like this :-)
-                     breaks = c(1:17),
-                   name = "Most common adaptive outcome",
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intragenomic epistasis, ", italic(K))), 
-                                       breaks = NULL, labels = NULL)) +
-  scale_y_continuous(name = "Proportion of adaptive walks/landscape",
-                     limits = c(0,1.02),
-                   sec.axis = sec_axis(~ . , name = substitute(paste("intergenomic epistasis, ", italic(C))), 
-                                       breaks = NULL, labels = NULL)) +
-  theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
-        text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
-  fig_theme
-
-
-```
-
-
-## Doing quartiles 
+### Fig. most common freq
 ```{r}
-
-# recode ranks to shift everything on the same scale
-entropy_stats_df$re_rank <- entropy_stats_df$most_common_rank
-
-entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 1, "re_rank"] <- 1
-entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 2, "re_rank"] <- 5
-entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 3, "re_rank"] <- 9
-entropy_stats_df[entropy_stats_df$c == 0 & entropy_stats_df$most_common_rank == 4, "re_rank"] <- 13
-
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 2 & entropy_stats_df$c_rep == 1, "re_rank"] <- 3
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 3 & entropy_stats_df$c_rep == 1, "re_rank"] <- 5
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 4 & entropy_stats_df$c_rep == 1, "re_rank"] <- 7
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 5 & entropy_stats_df$c_rep == 1, "re_rank"] <- 9
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 6 & entropy_stats_df$c_rep == 1, "re_rank"] <- 11
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 7 & entropy_stats_df$c_rep == 1, "re_rank"] <- 13
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 8 & entropy_stats_df$c_rep == 1, "re_rank"] <- 15
-
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 2 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 3
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 3 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 5
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 4 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 7
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 5 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 9
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 6 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 11
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 7 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 13
-entropy_stats_df[entropy_stats_df$c == 1 & entropy_stats_df$most_common_rank == 8 & entropy_stats_df$c_rep == 4 & entropy_stats_df$species == 2, "re_rank"] <- 15
-
-# add quartiles
-entropy_stats_df$Q <- NA
-entropy_stats_df[entropy_stats_df$re_rank %in% 1:4, "Q"] <- "Q1"
-entropy_stats_df[entropy_stats_df$re_rank %in% 5:8, "Q"] <- "Q2"
-entropy_stats_df[entropy_stats_df$re_rank %in% 9:12, "Q"] <- "Q3"
-entropy_stats_df[entropy_stats_df$re_rank %in% 13:16, "Q"] <- "Q4"
 
 localrep_N2_mostcommon <- ggplot(entropy_stats_df[entropy_stats_df$most_common_rank != 17,],
        aes(x = re_rank,
@@ -622,7 +644,6 @@ ggsave(path = "../Figures/Revisions",
        filename = "effectIM_N2_mostcommon.pdf",
        plot = effectIM_N2_mostcommon)
 ```
-
 ## Fig 4a - Repeatability N = 2
 This is the first results figure that shows how many adaptive walks lead to the same outcome on each of our fitness landscape replicates. Here we see the number of realised outcomes of adaptation as well as how often they are repeated on the same landscape
 ```{r}
@@ -710,18 +731,20 @@ ggsave(path = "../Figures/",
 ## melt seascapes data into right format to compare with NKC
 peaks_sea_ranked_summarised$landscape_ID <- interaction(peaks_sea_ranked_summarised$k, peaks_sea_ranked_summarised$k_e, peaks_sea_ranked_summarised$sea_rep, peaks_sea_ranked_summarised$scape_rep) 
 
-peaks_sea_ranked_melted <- reshape2::melt(peaks_sea_ranked_summarised[, c("k", "k_e", "sea_rep", "scape_rep", "walking", "prop_rank_peaked", "prop_cycle", "E1.rank", "E2.rank", "landscape_ID", "rank_peaked", "cycle_count")],
-                                id.vars = c("k", "k_e", "sea_rep", "scape_rep", "walking", "prop_rank_peaked", "prop_cycle","landscape_ID","rank_peaked", "cycle_count"),
+peaks_sea_ranked_melted <- reshape2::melt(peaks_sea_ranked_summarised[, c("k", "k_e", "sea_rep", "scape_rep", "walking", "prop_rank_peaked", "prop_cycle", "E1.rank", "E2.rank", "landscape_ID", "rank_peaked", "cycle_count", "cycle")],
+                                id.vars = c("k", "k_e", "sea_rep", "scape_rep", "walking", "prop_rank_peaked", "prop_cycle","landscape_ID","rank_peaked", "cycle_count","cycle"),
                                 variable.name = "rank")
 
 # right now all outcomes are based on distinct combinations of ranks between environments, since I stored this information together; therefore, I will sum all probabilities of reaching the same rank on the same landscape for each environment (independent of rank combinations)
 
 peaks_sea_ranked_melted_adj <- as.data.frame(peaks_sea_ranked_melted |> 
-                            dplyr::group_by(k, k_e, sea_rep, scape_rep, walking, rank, landscape_ID, value, prop_cycle,rank_peaked,cycle_count) |>
+                            dplyr::group_by(k, k_e, sea_rep, scape_rep, walking, rank, landscape_ID, value,cycle) |>
                             dplyr::summarise(prop_rank_peaked_adj = sum(prop_rank_peaked),
                                              rank_peaked_adj = sum(rank_peaked),
                                              prop_cycle_adj = sum(prop_cycle),
                                              cycle_count_adj = sum(cycle_count))) 
+
+peaks_sea_ranked_melted_adj[peaks_sea_ranked_melted_adj$cycle == "yes", "value"] <- 17
 
 ## now do same as above
 entropy_df_random_sea <- peaks_sea_ranked_melted_adj[peaks_sea_ranked_melted_adj$walking == "random",]
@@ -747,7 +770,6 @@ for (ID in unique(entropy_df_random_sea$landscape_ID)) { # for each unique lands
     most_common_rank <- temp_df[temp_df$prop_rank_peaked_adj == most_common, "value"]
     
     stats_temp <- data.frame(landscape_ID = ID,
-                             n = 2,
                               k = unique(temp_df$k),
                               k_e = unique(temp_df$k_e),
                              entropy = sum(-entropy),
@@ -768,9 +790,9 @@ entropy_stats_df_sea_final <- dplyr::distinct(entropy_stats_df_sea, landscape_ID
 
 # entropy
 entropy_fig_sea <- ggplot(entropy_stats_df_sea_final,
-       aes(x = interaction(n,k,k_e),
+       aes(x = interaction(k,k_e),
            y = entropy,
-           group = interaction(n,k,k_e))) +
+           group = interaction(k,k_e))) +
   geom_violin(col = "grey45") +
   geom_jitter(col = "forestgreen",
               size = 2.5,
@@ -785,6 +807,13 @@ entropy_fig_sea <- ggplot(entropy_stats_df_sea_final,
                shape = 18,
                size = 3,
                col = "black") +
+  scale_x_discrete(labels=c("0.0" = "4-0-0", 
+                            "1.0" = "4-1-0",
+                            "0.1" = "4-0-1",
+                            "1.1" = "4-1-1",
+                            "0.2" = "4-0-2",
+                            "1.2" = "4-1-2")) +
+  xlab(expression(N*"'"-K[w]-K[b])) +
   theme_bw() +
   theme(axis.title.y.right = element_text(angle = 90, vjust = 0.5),
         text = element_text(family = "Arial Unicode MS")) + # font family to display the unicode character; unfortunately this does not allow for italics :-(
@@ -827,13 +856,7 @@ most_common_sea <- ggplot(entropy_stats_df_sea[entropy_stats_df_sea$most_common_
 
 ## number of outcomes
 ```{r}
-# how many outcomes are there on the same landscape?
-peaks_total_ranked_summarised$landscape_ID <- interaction(peaks_total_ranked_summarised$n, peaks_total_ranked_summarised$k, peaks_total_ranked_summarised$c, peaks_total_ranked_summarised$c_rep, peaks_total_ranked_summarised$scape_rep)
-
-true_only_summed2 <- as.data.frame(peaks_total_ranked_summarised |> 
-                            dplyr::group_by(k, c, n, c_rep, k_rep, landscape_ID, species, walking) |>
-                            dplyr::summarise(outcomes = n())) 
-
+# how many landscapes have more than once outcome?
 # K = 1, C = 0
 mult_peak2 <- nrow(true_only_summed2[true_only_summed2$k == 1 & 
                             true_only_summed2$c == 0 &
@@ -892,7 +915,9 @@ mult_peak4 <- nrow(true_only_summedN4[true_only_summedN4$k == 1 &
 ####
 no_outcomes_df <- rbind(true_only_summed2, true_only_summedN4)
 
-no_outcomes <- ggplot(no_outcomes_df[no_outcomes_df$n == 2 &
+
+
+no_outcomes_NK <- ggplot(no_outcomes_df[no_outcomes_df$n == 4 &
                                        no_outcomes_df$walking == "random",],
        aes(y = outcomes,
            x = interaction(k,c,n),
@@ -900,7 +925,7 @@ no_outcomes <- ggplot(no_outcomes_df[no_outcomes_df$n == 2 &
   geom_violin() +
   geom_jitter(col = "forestgreen", # for equilibrium points
               size = 2.5,
-              height = 0.01,
+              height = 0.1,
               alpha = 0.3) +
   stat_summary(fun = mean,
                geom = "crossbar", # adds the mean proportion for each rank/landscape
@@ -912,42 +937,8 @@ no_outcomes <- ggplot(no_outcomes_df[no_outcomes_df$n == 2 &
                size = 3,
                col = "black") +
   scale_y_continuous(name = "Outcomes/landscape",
-                     limits = c(1,4.2),
-                     breaks = c(1:4)) +
-   scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
-                            "1.0.2" = "2-1-0",
-                            "0.1.2" = "2-0-1",
-                            "1.1.2" = "2-1-1",
-                            "0.2.2" = "2-0-2",
-                            "1.2.2" = "2-1-2",
-                            "1.0.4" = "4-1-0",
-                            "2.0.4" = "4-2-0",
-                            "3.0.4" = "4-3-0")) +
-  xlab("N-K-C") +
-  theme_bw() +
-  fig_theme
-
-
-no_outcomes_NK <- ggplot(no_outcomes_df[no_outcomes_df$n == 4 &
-                                       no_outcomes_df$walking == "random",],
-       aes(y = outcomes,
-           x = interaction(k,c,n),
-           group = interaction(k,c,n))) +
-  geom_violin() +
-  geom_jitter(col = "forestgreen", # for equilibrium points
-              size = 2.5,
-              height = 0.01,
-              alpha = 0.3) +
-  stat_summary(fun = mean,
-               geom = "crossbar", # adds the mean proportion for each rank/landscape
-               linewidth = 0.4,
-               col = "black") +
-  stat_summary(fun = median,
-               geom = "point", # adds the median proportion for each rank/landscape
-               shape = 18,
-               size = 3,
-               col = "black") +
-  scale_y_continuous(name = "Outcomes/landscape") +
+                     limits = c(0.9,15.1),
+                     breaks = c(1:15)) +
    scale_x_discrete(labels=c("0.0.2" = "2-0-0", 
                             "1.0.2" = "2-1-0",
                             "0.1.2" = "2-0-1",
@@ -1011,18 +1002,18 @@ mult_peak2 <- nrow(prop_only_summed2_R[prop_only_summed2_R$k == 0 &
 ## number of seascapes outcomes
 ```{r}
 # how many outcomes are there on the same landscape?
-no_outcomes_df_sea <- as.data.frame(peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$walking == "random",] |> 
-                            dplyr::group_by(k, k_e, n, sea_rep, landscape_ID) |>
+no_outcomes_df_sea <- as.data.frame(peaks_sea_ranked_melted_adj[peaks_sea_ranked_melted_adj$walking == "random",] |> 
+                            dplyr::group_by(k, k_e, sea_rep, landscape_ID, rank) |>
                             dplyr::summarise(outcomes = n())) 
 
 no_outcomes_sea <- ggplot(no_outcomes_df_sea,
        aes(y = outcomes,
-           x = interaction(k,k_e,n),
-           group = interaction(k,k_e,n))) +
+           x = interaction(k,k_e),
+           group = interaction(k,k_e))) +
   geom_violin() +
   geom_jitter(col = "forestgreen", # for equilibrium points
               size = 2.5,
-              height = 0.01,
+              height = 0.1,
               alpha = 0.3) +
   stat_summary(fun = mean,
                geom = "crossbar", # adds the mean proportion for each rank/landscape
@@ -1034,14 +1025,14 @@ no_outcomes_sea <- ggplot(no_outcomes_df_sea,
                size = 3,
                col = "black") +
   scale_y_continuous(name = "Outcomes/landscape",
-                     limits = c(1,15.2),
+                     limits = c(0.9,15.1),
                      breaks = c(1:15)) +
-   scale_x_discrete(labels=c("0.0.2" = "4-0-0", 
-                            "1.0.2" = "4-1-0",
-                            "0.1.2" = "4-0-1",
-                            "1.1.2" = "4-1-1",
-                            "0.2.2" = "4-0-2",
-                            "1.2.2" = "4-1-2")) +
+   scale_x_discrete(labels=c("0.0" = "4-0-0", 
+                            "1.0" = "4-1-0",
+                            "0.1" = "4-0-1",
+                            "1.1" = "4-1-1",
+                            "0.2" = "4-0-2",
+                            "1.2" = "4-1-2")) +
   xlab(expression(N*"'"-K[w]-K[b])) +
   theme_bw() +
   fig_theme
@@ -1375,7 +1366,7 @@ localrep_sea4 <- ggplot(peaks_sea_ranked_melted_adj[peaks_sea_ranked_melted_adj$
                geom = "crossbar",
                linewidth = 0.4,
                col = "black") +
-  stat_summary(aes(y = prop_cycle, # adds the median proportion of cycling/landscape
+  stat_summary(aes(y = prop_cycle_adj, # adds the median proportion of cycling/landscape
                   x = value),
                fun = median,
                geom = "point",
@@ -1604,8 +1595,8 @@ for (i in unique(c_rep)){ # for each interaction network replicate
     
     for (l in unique(walk_reps)) { # for each adaptive walk
       
-      ranks_sp1 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"]) # check how many unique metagenotypes there are during the last 20 steps of the adaptive walk
-      ranks_sp2 <- unique(peaks_nkcs_2011[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      ranks_sp1 <- unique(peaks_nkcs_2011[[5]][[1]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"]) # check how many unique metagenotypes there are during the last 20 steps of the adaptive walk
+      ranks_sp2 <- unique(peaks_nkcs_2011[[5]][[1]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
       
       # extract my information
       summary_temp <- data.frame(n = 2,
@@ -1662,8 +1653,8 @@ for (i in unique(c_rep)){ # IM replicates
     
     for (l in unique(walk_reps)) {
       
-      ranks_sp1 <- unique(peaks_nkcs_2111[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
-      ranks_sp2 <- unique(peaks_nkcs_2111[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      ranks_sp1 <- unique(peaks_nkcs_2111[[5]][[1]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2111[[5]][[1]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
       
       summary_temp <- data.frame(n = 2,
                               k = 1,
@@ -1718,8 +1709,8 @@ for (i in unique(c_rep)){ # IM replicates
     
     for (l in unique(walk_reps)) {
       
-      ranks_sp1 <- unique(peaks_nkcs_2021[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
-      ranks_sp2 <- unique(peaks_nkcs_2021[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      ranks_sp1 <- unique(peaks_nkcs_2021[[5]][[1]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2021[[5]][[1]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
       
       summary_temp <- data.frame(n = 2,
                               k = 0,
@@ -1774,8 +1765,8 @@ for (i in unique(c_rep)){ # IM replicates
     
     for (l in unique(walk_reps)) {
       
-      ranks_sp1 <- unique(peaks_nkcs_2121[[5]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
-      ranks_sp2 <- unique(peaks_nkcs_2121[[5]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
+      ranks_sp1 <- unique(peaks_nkcs_2121[[5]][[1]][[i]][[j]][[2]][[l]][[1]][c(230:250), "rank"])
+      ranks_sp2 <- unique(peaks_nkcs_2121[[5]][[1]][[i]][[j]][[2]][[l]][[2]][c(230:250), "rank"])
       
       summary_temp <- data.frame(n = 2,
                               k = 1,
@@ -1935,7 +1926,7 @@ for (i in unique(sea_rep)){ # for each interaction network replicate
   
   scape_reps <- peaks_total_sea[peaks_total_sea$n == 2 & peaks_total_sea$k == 0 & peaks_total_sea$k_e == 2 & 
                               peaks_total_sea$sea_rep == i &
-                           peaks_total_sea$step == 100 & 
+                           peaks_total_sea$step == 100 &
                        peaks_total_sea$walking == "random", "scape_rep"]
   
   for (j in unique(scape_reps)) { # for each fitness landscape replicate
@@ -2137,7 +2128,8 @@ df_cycles_sea <- data.frame(k = summary_cycles_sea$k,
                             prop_rank_peaked = summary_cycles_sea$appeared/80,
                             landscape_ID = summary_cycles_sea$scape_ID)
 
-sea_ranked_w_cycles <- peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$E1.rank != 17, !names(peaks_sea_ranked_summarised) %in% c("walking","cycle_count","tot_reps","prop_cycle")]
+sea_ranked_w_cycles <- peaks_sea_ranked_summarised[peaks_sea_ranked_summarised$E1.rank != 17 &
+                                                     peaks_sea_ranked_summarised$cycle == "no", !names(peaks_sea_ranked_summarised) %in% c("walking","cycle_count","tot_reps","prop_cycle")]
 
 sea_ranked_w_cycles <- rbind(sea_ranked_w_cycles, df_cycles_sea)
 
@@ -2714,12 +2706,88 @@ summary_cors_nkke_401 <- rbind(summary_cors_nkke_401, summary_temp) # combine al
 }
 
 ### now repeat for all others
-# ...
+# N = 2, Kw = 0, Kb = 2
+## prep dataframes 
+combined_scapes_nkke_402 <- list() # here I store the combined landscapes and the correlation of their fitness ranks
+summary_cors_nkke_402 <- NULL # and this is to keep track of the summaries (correlation for each landscape)
+
+for (i in 1){ # for each interaction matrix
+  
+  combined_scapes_nkke_402[[i]] <- list() # prep entry in list for storage
+  
+for (j in 1:50){ # for each landscape replicate
+  
+  scape <- peaks_nkke_402[[3]][[i]][[j]]
+
+summary_temp <- data.frame(n = 2,
+                              k = 0,
+                              k_e = 2,
+                              sea_rep = i,
+                              scape_rep = j,
+                              corr_rank = cor(scape$E1.rank, scape$E2.rank),
+                           landscape_ID = interaction(0, 2, i, j))
+
+summary_cors_nkke_402 <- rbind(summary_cors_nkke_402, summary_temp) # combine all stats
+
+}
+}
+
+# N = 2, Kw = 1, Kb = 1
+## prep dataframes 
+combined_scapes_nkke_411 <- list() # here I store the combined landscapes and the correlation of their fitness ranks
+summary_cors_nkke_411 <- NULL # and this is to keep track of the summaries (correlation for each landscape)
+
+for (i in 1){ # for each interaction matrix
+  
+  combined_scapes_nkke_411[[i]] <- list() # prep entry in list for storage
+  
+for (j in 1:50){ # for each landscape replicate
+  
+  scape <- peaks_nkke_411[[3]][[i]][[j]]
+
+summary_temp <- data.frame(n = 2,
+                              k = 1,
+                              k_e = 1,
+                              sea_rep = i,
+                              scape_rep = j,
+                              corr_rank = cor(scape$E1.rank, scape$E2.rank),
+                           landscape_ID = interaction(1, 1, i, j))
+
+summary_cors_nkke_411 <- rbind(summary_cors_nkke_411, summary_temp) # combine all stats
+
+}
+}
+
+# N = 2, Kw = 1, Kb = 2
+## prep dataframes 
+combined_scapes_nkke_412 <- list() # here I store the combined landscapes and the correlation of their fitness ranks
+summary_cors_nkke_412 <- NULL # and this is to keep track of the summaries (correlation for each landscape)
+
+for (i in 1){ # for each interaction matrix
+  
+  combined_scapes_nkke_412[[i]] <- list() # prep entry in list for storage
+  
+for (j in 1:50){ # for each landscape replicate
+  
+  scape <- peaks_nkke_412[[3]][[i]][[j]]
+
+summary_temp <- data.frame(n = 2,
+                              k = 1,
+                              k_e = 2,
+                              sea_rep = i,
+                              scape_rep = j,
+                              corr_rank = cor(scape$E1.rank, scape$E2.rank),
+                           landscape_ID = interaction(1, 2, i, j))
+
+summary_cors_nkke_412 <- rbind(summary_cors_nkke_412, summary_temp) # combine all stats
+
+}
+}
 
 #############
 
 # now I combine all the stats across all landscapes into one big data frame
-summary_cors_sea <- rbind(summary_cors_nkke_401)
+summary_cors_sea <- rbind(summary_cors_nkke_401, summary_cors_nkke_402, summary_cors_nkke_411, summary_cors_nkke_412)
 
 # and I want to link the correlations I just calculated to my results; so I add it so my data frame, where the adaptive outcomes of both species are combined 
 
@@ -2750,16 +2818,29 @@ for (i in 1:nrow(sea_ranked_w_cycles)){
 }
 
 
+for (i in 1:nrow(summary_cycles_sea)){
+  
+  ID <- summary_cycles_sea[i, "scape_ID" ]
+  
+  if (ID %in% summary_cors_sea$landscape_ID){
+    
+    summary_cycles_sea[i, "corr_rank" ] <- unique(summary_cors_sea[as.character(summary_cors_sea$landscape_ID) == as.character(ID), "corr_rank"])
+    
+  }
+
+}
+
+
 
 # now, let's plot; since this type of figure is difficult to interpret we only show one of them in the main text and the rest can be found in the supplementary material
 
 # we combine four plots; (i) the results for N = 2, K = 0, C = 1, with an empty plot as an inset; here I add our expectations and the categorisation of win/win, Lose/lose, win/lose and cycling in post using Adobe illustrator, (ii) a distance plot to show how the difference in fitness ranks depends on the fitness rank correlation, and (iii) the mean community fitness load
 
 # first plot - "interaction results"
-eco_outcome_env <- ggplot(peaks_sea_ranked_summarised[!is.na(peaks_sea_ranked_summarised$corr_rank) &
+eco_outcome_sea <- ggplot(peaks_sea_ranked_summarised[!is.na(peaks_sea_ranked_summarised$corr_rank) &
                                                        peaks_sea_ranked_summarised$k == 0 &
                                                        peaks_sea_ranked_summarised$k_e == 1 &
-                                                       peaks_sea_ranked_summarised$E1.rank != 17,], # will add in the explicit cycle results afterwards
+                                                       peaks_sea_ranked_summarised$cycle == "no",], # will add in the explicit cycle results afterwards
        aes(x = corr_rank,
            y = E1.rank)) +
   geom_hline(yintercept = 1, # plot horizontal line for 0 fitness load
@@ -2778,11 +2859,11 @@ eco_outcome_env <- ggplot(peaks_sea_ranked_summarised[!is.na(peaks_sea_ranked_su
       yend = mean_rank_ev2,
       alpha = appeared/80),
       col = "grey40") +
-  geom_point(size = 2.5, # species 1
+  geom_point(size = 2.5, # env 1
              aes(alpha = rank_peaked/80,
                  col = "Equilibrium")) +
   geom_point(aes(x = corr_rank,
-                 y = rank_ev2, # species 2
+                 y = E2.rank, # env 2
                  alpha = rank_peaked/80,
                  col = "Equilibrium"),
              size = 2.5) +
@@ -2825,59 +2906,26 @@ eco_outcome_env <- ggplot(peaks_sea_ranked_summarised[!is.na(peaks_sea_ranked_su
         legend.background = element_rect(fill = "transparent"))
 
 
-# second plot - inset
-blank <- ggplot(community_ranked_w_cycles[community_ranked_w_cycles$k == 0 &
-                                                       community_ranked_w_cycles$c == 1,],
-       aes(x = corr_rank,
-           y = rank_sp1)) +
-  scale_y_continuous(labels = c("0", "3", "6", "9", "12", "15"), 
-                     breaks = seq(1, 16, 3),
-                     limits = c(1,16),
-                   name = "") +
-  scale_x_continuous(name = "  ",
-                   limits = c(-1,1)) +
-  theme_bw() +
-  theme(axis.text.x.bottom = element_text(size=16),
-                        axis.text.y = element_text(size=15),
-                        axis.title = element_text(size=24),
-        axis.title.y = element_text(size=17),
-                      legend.position = "none",
-                      strip.text.x = element_text(size = 15),
-                      strip.text.y = element_text(size = 15, angle = 0),
-                   panel.grid.minor.x = element_blank(),
-        panel.grid.minor.y = element_blank(),
-        panel.grid.major.y = element_blank(),
-        plot.background = element_blank()) 
-
-# combine 1 and 2
-panel_a <- eco_outcome + 
-  annotation_custom(ggplotGrob(blank),
-                                xmin = 0.4,
-                                xmax = 1,
-                                ymin = 10,
-                                ymax = 16.5)
-
-
 # third plot - difference in fitness ranks between the species
 
 # for this I fit a generalised linear mixed model
-model_diff3 <- glmmTMB::glmmTMB(abs(rank_sp1-rank_sp2) ~ corr_rank + c + k + cycle,
-               data = community_ranked_w_cycles[community_ranked_w_cycles$c != 0,],
+model_diff3 <- glmmTMB::glmmTMB(abs(E1.rank-E2.rank) ~ corr_rank + k_e + k + cycle,
+               data = sea_ranked_w_cycles[sea_ranked_w_cycles$k_e != 0,],
                family = poisson,
                weights = rank_peaked) # weighted by often the outcomes occur
 
-community_ranked_w_cycles_tst <- community_ranked_w_cycles[community_ranked_w_cycles$c != 0,]
+sea_ranked_w_cycles_tst <- sea_ranked_w_cycles[sea_ranked_w_cycles$k_e != 0,]
  
 #add predictions to plot trend lines
-community_ranked_w_cycles_tst$predict = predict(model_diff3, 
+sea_ranked_w_cycles_tst$predict = predict(model_diff3, 
                                                 type = "response", 
-                                                newdata = community_ranked_w_cycles_tst)
+                                                newdata = sea_ranked_w_cycles_tst)
 
 
-distance_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_tst$k == 0 &
-                                                       community_ranked_w_cycles_tst$c == 1,], # I want to only show C = 0 as an example
+distance_plot_sea <- ggplot(sea_ranked_w_cycles_tst[sea_ranked_w_cycles_tst$k == 0 &
+                                                       sea_ranked_w_cycles_tst$k_e == 1,], # I want to only show C = 0 as an example
        aes(x = corr_rank,
-           y = abs(rank_sp1-rank_sp2))) +
+           y = abs(E1.rank-E2.rank))) +
   geom_hline(yintercept = 0,
              col = "grey") +
   geom_point(aes(alpha = rank_peaked/80,
@@ -2911,20 +2959,20 @@ distance_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_
 # fourth plot - community fitness load
 
 # I fit another glmm for this using the same formula as above
-model_mean3 <- glmmTMB::glmmTMB((rank_sp1+rank_sp2)/2 ~ corr_rank + c + k + cycle,
-               data = community_ranked_w_cycles[community_ranked_w_cycles$c != 0,],
+model_mean3 <- glmmTMB::glmmTMB((E1.rank+E2.rank)/2 ~ corr_rank + k_e + k + cycle,
+               data = sea_ranked_w_cycles[sea_ranked_w_cycles$k_e != 0,],
                family = poisson,
                weights = rank_peaked)
 
-community_ranked_w_cycles_tst$predict_mean = predict(model_mean3, 
+sea_ranked_w_cycles_tst$predict_mean = predict(model_mean3, 
                                                 type = "response", 
-                                                newdata = community_ranked_w_cycles_tst)
+                                                newdata = sea_ranked_w_cycles_tst)
 
 
-mean_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_tst$k == 0 &
-                                                       community_ranked_w_cycles_tst$c == 1,],
+mean_plot_sea <- ggplot(sea_ranked_w_cycles_tst[sea_ranked_w_cycles_tst$k == 0 &
+                                                       sea_ranked_w_cycles_tst$k_e == 1,],
        aes(x = corr_rank,
-           y = (rank_sp1+rank_sp2)/2)) +
+           y = (E1.rank+E2.rank)/2)) +
   geom_hline(yintercept = 1,
              col = "grey") +
   geom_point(aes(alpha = rank_peaked/80,
@@ -2939,7 +2987,7 @@ mean_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_tst$
   scale_y_continuous(labels = c("0", "2", "4", "6", "8", "10", "12", "14"),
                      breaks = seq(1,15,2),
                      limits = c(1,16),
-                   name = "Community fitness load") +
+                   name = "Environmental fitness load") +
   scale_x_continuous(name = "rank correlation(F, P)",
                    limits = c(-1,1)) +
   theme_bw() +
@@ -2956,23 +3004,12 @@ mean_plot <- ggplot(community_ranked_w_cycles_tst[community_ranked_w_cycles_tst$
         axis.title.y.right = element_text(angle = 0, vjust = 0.5)) 
 
 # combined plots
-fig_test <- ggpubr::ggarrange(panel_a, NULL, # to have some extra space :-)
-                  ggpubr::ggarrange(distance_plot, mean_plot, ncol = 2),
-                  nrow = 3,
-                     heights = c(1.7, 0.1, 1))
 
-ggsave(path = "../Figures/",
-       device = cairo_pdf, # to save pdf with unicode
-       units = c("cm"),
-       width = 30,
-       height = 25,
-       filename = "eco_fig.pdf",
-       plot = fig_test)
 
 ```
 
 
-# 3.) Supplementary figures 
+# (ii) Supplementary figures 
 ## fitness distribution -random
 Here we show which fitness outcomes are the most common, which gives us the expected fitness distribution for each combination of K and C; this figure also shows the cycling probability
 ```{r}
@@ -4775,7 +4812,7 @@ ggsave(path = "../Figures/",
        plot = fitness_dis_N4)
 ```
 
-# 4.) Additional figures
+# (iii) Additional figures
 These are all the figures that did not make it into the final manuscript but might be interesting to brows/use in the future
 
 ## Fitness landscape example; "classic" version
