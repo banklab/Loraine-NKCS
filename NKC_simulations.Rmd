@@ -7,7 +7,8 @@ Loraine Hablützel - 22.06.2026
 see preprint: https://doi.org/10.64898/2026.04.01.715933
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(dev = "png")
+options(bitmapType = "cairo")
 
 knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
 ```
@@ -746,7 +747,7 @@ save(peaks_total, # summary output of every single replicate walk on every repli
 set.seed(2512) # for reproducibility
 
 # most parameters are kept the same from the NKC simulations; therefor the parameters chunk from the NKC model must be run before this
-p = 0 # number of pleiotropic loci; I have not actually implemented this yet lol but I also don't need it - take it as future inspiration
+p = 0 # number of pleiotropic loci; I have not actually implemented this yet lol but I also don't need it - take it as free future inspiration
 env_tot = 2 # total number of environments in the system
 lambda_change = 1 # if I want to draw the number of mutational steps from a poisson distribution
 max_steps = 150
@@ -1240,8 +1241,8 @@ peaks_sea_cycle_summarised <- as.data.frame(peaks_total_sea[peaks_total_sea$step
                             dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank) |>
                             dplyr::summarise(cycle_count = n())) 
 peaks_sea_cycle_summarised$cycle <- "yes" 
-peaks_sea_cycle_summarised$E1.rank <- 17 # for plotting reasons
-peaks_sea_cycle_summarised$E2.rank <- 17 # for plotting reasons
+#peaks_sea_cycle_summarised$E1.rank <- 17 # will do this later this time
+#peaks_sea_cycle_summarised$E2.rank <- 17 # will do this later this time
 
 peaks_sea_ranked_summarised <- merge(peaks_sea_ranked_summarised, 
       peaks_sea_cycle_summarised, 

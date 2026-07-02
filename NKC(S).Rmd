@@ -7,7 +7,8 @@ Loraine Hablützel - 09.06.2026
 see preprint: https://doi.org/10.64898/2026.04.01.715933
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(dev = "png")
+options(bitmapType = "cairo")
 
 knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
 ```
