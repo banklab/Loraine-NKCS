@@ -3,7 +3,7 @@ title: "NKC(S)"
 output: html_notebook
 ---
 
-Loraine Hablützel - 09.06.2026
+Loraine Hablützel - 28.07.2026
 see preprint: https://doi.org/10.64898/2026.04.01.715933
 
 ```{r setup, include=FALSE}
@@ -2051,3 +2051,138 @@ return(list(peaks_df, # store the dataset with endpoint stats of adaptive walks
 
 }
 ````
+
+# (C) Additional Functions
+## 1) Finding local and global fitness peaks on a NKC landscape
+```{r}
+
+peakfinder_NKC <- function(visual_scape # combined fitness landscapes of two species
+){
+  
+  visual_scape$fit_step <- NA
+  
+      # for intergenomic transitions -> this will give me all peaks of the focal species
+  for(i in unique(visual_scape$background)){ # peaks of focal species
+    
+    temp_groups <- visual_scape[visual_scape$background == i & visual_scape$mut == "intra", "group"] # all possible transitions within the focal genome
+    
+    peaks_temp_df <- NULL
+    
+    for(j in unique(temp_groups)){
+      
+    if(visual_scape[visual_scape$background == i & 
+                    visual_scape$mut == "intra" &
+                    visual_scape$group == j, "rank_sp1"][1]  > 
+       visual_scape[visual_scape$background == i & 
+                    visual_scape$mut == "intra" &
+                    visual_scape$group == j, "rank_sp1"][2]){
+      
+      visual_scape[visual_scape$background == i & 
+                    visual_scape$mut == "intra" &
+                    visual_scape$group == j, "fit_step"][1] <- "inc"
+      
+      visual_scape[visual_scape$background == i & 
+                    visual_scape$mut == "intra" &
+                    visual_scape$group == j, "fit_step"][2] <- "dec"
+      
+    } else {
+      
+      visual_scape[visual_scape$background == i & 
+                    visual_scape$mut == "intra" &
+                    visual_scape$group == j, "fit_step"][1] <- "dec"
+      
+      visual_scape[visual_scape$background == i & 
+                    visual_scape$mut == "intra" &
+                    visual_scape$group == j, "fit_step"][2] <- "inc"
+      
+      
+    }
+    
+    }
+    
+  }
+  
+  intra_df <- visual_scape[visual_scape$mut == "intra",]
+  peaks_sp1 <- NULL
+  
+  for(seq in unique(intra_df$seq)){
+    
+    if(all(intra_df[intra_df$seq == seq, "fit_step"] == "dec")){
+      
+      peaks_sp1 <- rbind(peaks_sp1, intra_df[intra_df$seq == seq, ][1,])
+      
+    }
+    
+  }
+  
+  peaks_sp1 <- peaks_sp1[, 1:14]
+  
+  #######
+  
+  # for intragenomic transitions -> this will give me all peaks of the partner species
+  for(i in unique(visual_scape$gen)){ # peaks of partner species
+    
+    temp_groups <- visual_scape[visual_scape$gen == i & visual_scape$mut == "inter", "group"] # all possible transitions within the partner genome
+    
+    peaks_temp_df <- NULL
+    
+    for(j in unique(temp_groups)){
+      
+    if(visual_scape[visual_scape$gen == i & 
+                    visual_scape$mut == "inter" &
+                    visual_scape$group == j, "rank_sp2"][1]  > 
+       visual_scape[visual_scape$gen == i & 
+                    visual_scape$mut == "inter" &
+                    visual_scape$group == j, "rank_sp2"][2]){
+      
+      visual_scape[visual_scape$gen == i & 
+                    visual_scape$mut == "inter" &
+                    visual_scape$group == j, "fit_step"][1] <- "inc"
+      
+      visual_scape[visual_scape$gen == i & 
+                    visual_scape$mut == "inter" &
+                    visual_scape$group == j, "fit_step"][2] <- "dec"
+      
+    } else {
+      
+      visual_scape[visual_scape$gen == i & 
+                    visual_scape$mut == "inter" &
+                    visual_scape$group == j, "fit_step"][1] <- "dec"
+      
+      visual_scape[visual_scape$gen == i & 
+                    visual_scape$mut == "inter" &
+                    visual_scape$group == j, "fit_step"][2] <- "inc"
+      
+      
+    }
+    
+    }
+    
+  }
+  
+  inter_df <- visual_scape[visual_scape$mut == "inter",]
+  peaks_sp2 <- NULL
+  
+  for(seq in unique(inter_df$seq)){
+    
+    if(all(inter_df[inter_df$seq == seq, "fit_step"] == "dec")){
+      
+      peaks_sp2 <- rbind(peaks_sp2, inter_df[inter_df$seq == seq, ][1,])
+      
+    }
+    
+  }
+  
+  peaks_sp2 <- peaks_sp2[, 1:14]
+  
+  joint_peaks <- peaks_sp2[peaks_sp2$genotypeID %in% peaks_sp1$genotypeID, ]
+  
+  
+  return(list(peaks_sp1, peaks_sp2, joint_peaks))
+  
+}
+  
+
+
+
+```
