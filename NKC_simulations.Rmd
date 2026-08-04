@@ -3,7 +3,9 @@ title: "NKC_exploration"
 output: html_notebook
 ---
 
-Loraine Hablützel - 22.06.2026
+Loraine Hablützel - 29.07.2026
+This is the code used to generate all simulations; note that this takes quite a while to run with the number of landscape replicates, walk replicates and adaptive walk cutoffs I'm using. (Estimate: ~2 days for the NK(C) simulations and another ~3 days for the seascapes; once the NKC landscapes have been generated, you can plug them into the simulations with different mutation rates or reuse them for the seascapes simulations, so these parts can be split up and ran in parallel!)
+
 see preprint: https://doi.org/10.64898/2026.04.01.715933
 
 ```{r setup, include=FALSE}
@@ -43,7 +45,7 @@ fit_sd = 0.5 # sd of distribution from which we draw fitness contribution
 walk_reps = 80 # number of replicates for adaptive walks on a fitness landscape - starting at each metagenotype 5 times
 walk_type = c("greedy", "random", "prop") # types of adaptive walks implemented
 walk_start = "S" # where to start the adaptive walks (R - Random, WT - wildtype, S - specified)
-max_steps = 250 # max number of steps in the adaptive walk
+max_steps = 300 # max number of steps in the adaptive walk
 
 # defining the starting sequences for N = 2, so I can cycle through all possible starting points
 metatypes_n2 <- gtools::permutations(a, 2*n, c(1:a), repeats = TRUE) # all possible metagenotypes
@@ -75,6 +77,12 @@ IM_k3_n4 <- list(build_IMk(IM = "R",
                       3,
                       s,
                       s_tot)) # only one possible layout; all ones
+
+IM_k0_n4 <- list(build_IMk(IM = "R",
+                      4,
+                      0,
+                      s,
+                      s_tot)) # only one possible layout
 
 # replicates of interaction matrices
 ## K = 1
@@ -494,6 +502,28 @@ peaks_nkcs_2121_Random <- assess_peaks_R_input(n,
 ## N' = 4 (static NK comparison)
 set.seed(2512)
 
+
+peaks_nkcs_4001 <- assess_peaks_R(n = 4, 
+                         k = 0,
+                         a, 
+                         c = 0, 
+                         s = 0, 
+                         R = 1,
+                         R_lambda,
+                         s_tot = 1, 
+                         IM_ks = IM_k0_n4,
+                         IM_cs = IM_c0_n4, 
+                         scape_reps = 200, 
+                         fitness_contrib, 
+                         fitness_calculation,
+                         fit_mean, 
+                         fit_sd, 
+                         walk_reps, 
+                         walk_type, 
+                         walk_start,
+                         start_seqs = metaseqs_n4, 
+                         max_steps)
+
 peaks_nkcs_4101 <- assess_peaks_R(n = 4, 
                          k = 1,
                          a, 
@@ -504,7 +534,7 @@ peaks_nkcs_4101 <- assess_peaks_R(n = 4,
                          s_tot, 
                          IM_ks = IM_k1_n4,
                          IM_cs = IM_c0_n4, 
-                         scape_reps, 
+                         scape_reps = 40, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -525,7 +555,7 @@ peaks_nkcs_4201 <- assess_peaks_R(n = 4,
                          s_tot, 
                          IM_ks = IM_k2_n4,
                          IM_cs = IM_c0_n4,
-                         scape_reps, 
+                         scape_reps = 40, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -546,7 +576,7 @@ peaks_nkcs_4301 <- assess_peaks_R(n = 4,
                          s_tot, 
                          IM_ks = IM_k3_n4,
                          IM_cs = IM_c0_n4,
-                         scape_reps = 250, 
+                         scape_reps = 200, 
                          fitness_contrib, 
                          fitness_calculation,
                          fit_mean, 
@@ -557,9 +587,10 @@ peaks_nkcs_4301 <- assess_peaks_R(n = 4,
                          start_seqs = metaseqs_n4, 
                          max_steps)
 
-peaks_total <- dplyr::bind_rows(#peaks_nkcs_4101[[1]],
-                                #peaks_nkcs_4201[[1]],
-                                #peaks_nkcs_4301[[1]],
+peaks_total <- dplyr::bind_rows(peaks_nkcs_4001[[1]],
+                                peaks_nkcs_4101[[1]],
+                                peaks_nkcs_4201[[1]],
+                                peaks_nkcs_4301[[1]],
                                 peaks_nkcs_2121[[1]],
                                 peaks_nkcs_2111[[1]],
                                 peaks_nkcs_2101[[1]],
@@ -583,45 +614,69 @@ peaks_total_R$reached <- peaks_total_R$fitness == peaks_total_R$global_peak # I 
 
 ## 1.3) summarising the results
 ```{r}
-# group simulations by how many species reached their global peak (0/1/2)
-peaks_total2 <- as.data.frame(peaks_total |> 
-                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, step, walk_rep, walking) |>
-                            dplyr::summarise(peaked = sum(reached)))
 
-## count potential cycles
-peaks_total2[peaks_total2$step < max_steps, "pot_cycle"] <- 0 
-peaks_total2[peaks_total2$step == max_steps, "pot_cycle"] <- 1 # identify potential cycles
+#### I recode the ranks ranks to shift everything on the same scale (e.g., when C = 0, there are only 4 distinct fitness ranks for a species -> I shift the ranks so they cover the same scale as the 16 unique ranks possible on landscapes with C > 0)
 
-## summarise the adaptive walk replicates
-peaks_summarised <- as.data.frame(peaks_total2 |> 
-                            dplyr::group_by(k, c, n, k_rep, c_rep, scape_rep, walking, peaked) |>
-                            dplyr::summarise(peak_count = n(),
-                                             cycle_count = sum(pot_cycle)) |>
-  tidyr::complete(peaked = 0:2, fill = list(peak_count = 0,
-                                            cycle_count = 0))) # add events that did not occur to the df with count 0 to get probabilities of events
+peaks_total$re_rank <- peaks_total$rank
 
-## calculate percentages 
-peaks_summarised$tot_reps <- walk_reps
-peaks_summarised$prop_reached <- peaks_summarised$peak_count/peaks_summarised$tot_reps
-peaks_summarised$prop_cycled <- peaks_summarised$cycle_count/peaks_summarised$tot_reps
+# in the absence of intergenomic epistasis ther are only 4 distinct fitness ranks per species
+peaks_total[peaks_total$c == 0 & peaks_total$n == 2 & peaks_total$rank == 1, "re_rank"] <- 1
+peaks_total[peaks_total$c == 0 & peaks_total$n == 2 & peaks_total$rank == 2, "re_rank"] <- 5
+peaks_total[peaks_total$c == 0 & peaks_total$n == 2 & peaks_total$rank == 3, "re_rank"] <- 9
+peaks_total[peaks_total$c == 0 & peaks_total$n == 2 & peaks_total$rank == 4, "re_rank"] <- 13
 
-# summarise cycling behaviour instead
-peaks_summarised_cycles <- as.data.frame(peaks_summarised |> 
-                            dplyr::group_by(k, c, n, walking, k_rep, c_rep, peaked) |>
-                            dplyr::summarise(cycles_count = sum(cycle_count))) 
+# depending on the intergenomic interaction matrix there is some neutrality/redundancy between metagenotypes and therefore less fitness ranks
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 2 & peaks_total$c_rep == 1, "re_rank"] <- 3
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 3 & peaks_total$c_rep == 1, "re_rank"] <- 5
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 4 & peaks_total$c_rep == 1, "re_rank"] <- 7
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 5 & peaks_total$c_rep == 1, "re_rank"] <- 9
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 6 & peaks_total$c_rep == 1, "re_rank"] <- 11
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 7 & peaks_total$c_rep == 1, "re_rank"] <- 13
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 8 & peaks_total$c_rep == 1, "re_rank"] <- 15
 
-peaks_summarised_cycles$prop_cycles <- peaks_summarised_cycles$cycles_count/(walk_reps*scape_reps)
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 2 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 3
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 3 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 5
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 4 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 7
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 5 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 9
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 6 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 11
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 7 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 13
+peaks_total[peaks_total$c == 1 & peaks_total$rank == 8 & peaks_total$c_rep == 4 & peaks_total$species == 2, "re_rank"] <- 15
 
-####### group simulations by fitness rank instead
+## same for variable R
+peaks_total_R$re_rank <- peaks_total_R$rank
 
+# in the absence of intergenomic epistasis ther are only 4 distinct fitness ranks per species
+peaks_total_R[peaks_total_R$c == 0 & peaks_total_R$rank == 1, "re_rank"] <- 1
+peaks_total_R[peaks_total_R$c == 0 & peaks_total_R$rank == 2, "re_rank"] <- 5
+peaks_total_R[peaks_total_R$c == 0 & peaks_total_R$rank == 3, "re_rank"] <- 9
+peaks_total_R[peaks_total_R$c == 0 & peaks_total_R$rank == 4, "re_rank"] <- 13
+
+# depending on the intergenomic interaction matrix there is some neutrality/redundancy between metagenotypes and therefore less fitness ranks
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 2 & peaks_total_R$c_rep == 1, "re_rank"] <- 3
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 3 & peaks_total_R$c_rep == 1, "re_rank"] <- 5
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 4 & peaks_total_R$c_rep == 1, "re_rank"] <- 7
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 5 & peaks_total_R$c_rep == 1, "re_rank"] <- 9
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 6 & peaks_total_R$c_rep == 1, "re_rank"] <- 11
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 7 & peaks_total_R$c_rep == 1, "re_rank"] <- 13
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 8 & peaks_total_R$c_rep == 1, "re_rank"] <- 15
+
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 2 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 3
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 3 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 5
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 4 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 7
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 5 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 9
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 6 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 11
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 7 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 13
+peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 8 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 15
+
+## summarise
 peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < max_steps,] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, rank, species) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, re_rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_cycle_summarised <- as.data.frame(peaks_total[peaks_total$step == max_steps,] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
                             dplyr::summarise(cycle_count = n())) 
-peaks_total_cycle_summarised$rank <- 17 # I assign the cycles rank "17" for plotting reasons; obvisouly only works for my 2 sp/2 loci setup 
+peaks_total_cycle_summarised$re_rank <- 17 # I assign the cycles rank "17" for plotting reasons; obviously only works for my 2 sp/2 loci setup 
 
 peaks_total_ranked_summarised <- merge(peaks_total_ranked_summarised, 
       peaks_total_cycle_summarised, 
@@ -633,17 +688,26 @@ peaks_total_ranked_summarised$prop_rank_peaked <- peaks_total_ranked_summarised$
 peaks_total_ranked_summarised$prop_cycle <- peaks_total_ranked_summarised$cycle_count/peaks_total_ranked_summarised$tot_reps
 
 # repeat for simulations with different mutation rounds
-peaks_total_ranked_summarised_R <- as.data.frame(peaks_total_R[peaks_total_R$step < max_steps,] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, rank, species) |>
+peaks_total_ranked_summarised_R <- as.data.frame(peaks_total_R[peaks_total_R$step < max_steps & !is.na(peaks_total_R$R),] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, re_rank, species, R) |>
                             dplyr::summarise(rank_peaked = n())) 
 
-peaks_total_cycle_summarised_R <- as.data.frame(peaks_total_R[peaks_total_R$step == max_steps,] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
+peaks_total_cycle_summarised_R <- as.data.frame(peaks_total_R[peaks_total_R$step >= max_steps & !is.na(peaks_total_R$R),] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species, R) |>
                             dplyr::summarise(cycle_count = n())) 
-#peaks_total_cycle_summarised_R$rank <- 17 # no cycles here
+peaks_total_cycle_summarised_R$re_rank <- 17 
+
+peaks_total_ranked_summarised_Ran <- as.data.frame(peaks_total_R[peaks_total_R$step < 1000 & is.na(peaks_total_R$R),] |> 
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, re_rank, species, R) |>
+                            dplyr::summarise(rank_peaked = n())) 
+
 
 peaks_total_ranked_summarised_R <- merge(peaks_total_ranked_summarised_R, 
-      peaks_total_cycle_summarised_R, 
+      peaks_total_cycle_summarised_R,
+      all.x = TRUE, all.y = TRUE)
+
+peaks_total_ranked_summarised_R <- merge(peaks_total_ranked_summarised_R, 
+      peaks_total_ranked_summarised_Ran,
       all.x = TRUE, all.y = TRUE)
 
 ## calculate percentages 
@@ -651,32 +715,31 @@ peaks_total_ranked_summarised_R$tot_reps <- walk_reps
 peaks_total_ranked_summarised_R$prop_rank_peaked <- peaks_total_ranked_summarised_R$rank_peaked/peaks_total_ranked_summarised_R$tot_reps
 peaks_total_ranked_summarised_R$prop_cycle <- peaks_total_ranked_summarised_R$cycle_count/peaks_total_ranked_summarised_R$tot_reps
 
-
 ####### above, all df have separate rows for the different species; here we combine both
 # combine both species into a single data frame and give each landscape a unique ID
 peaks_total_ranked2 <- as.data.frame(peaks_total[peaks_total$n == 2 &
                                                    peaks_total$step < max_steps &
                                                               peaks_total$walking == "random",] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, re_rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_ranked2_cyc <- as.data.frame(peaks_total[peaks_total$n == 2 &
-                                                   peaks_total$step == max_steps &
+                                                   peaks_total$step >= max_steps &
                                                               peaks_total$walking == "random",] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, re_rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
-peaks_total_ranked2_cyc$rank <- 17
+peaks_total_ranked2_cyc$re_rank <- 17
 
 peaks_total_ranked2 <- bind_rows(peaks_total_ranked2, peaks_total_ranked2_cyc)
 
 peaks_total_ranked2_comb <- peaks_total_ranked2[peaks_total_ranked2$species == 1,]
 
-colnames(peaks_total_ranked2_comb)[9] <- "rank_sp1"
-peaks_total_ranked2_comb$rank_sp2 <- peaks_total_ranked2[peaks_total_ranked2$species == 2, "rank"]
+colnames(peaks_total_ranked2_comb)[9] <- "re_rank_sp1"
+peaks_total_ranked2_comb$re_rank_sp2 <- peaks_total_ranked2[peaks_total_ranked2$species == 2, "re_rank"]
 
 peaks_total_ranked2_summarised <- as.data.frame(peaks_total_ranked2_comb |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, rank_sp1, rank_sp2, species) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, re_rank_sp1, re_rank_sp2, species) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_ranked2_summarised$landscape_ID <- interaction(peaks_total_ranked2_summarised$n, peaks_total_ranked2_summarised$k, peaks_total_ranked2_summarised$c, peaks_total_ranked2_summarised$c_rep, peaks_total_ranked2_summarised$scape_rep)
@@ -685,26 +748,26 @@ peaks_total_ranked2_summarised$landscape_ID <- interaction(peaks_total_ranked2_s
 peaks_total_ranked2_R <- as.data.frame(peaks_total_R[peaks_total_R$n == 2 &
                                                    peaks_total_R$step < max_steps &
                                                               peaks_total_R$walking == "random",] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species, R) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, re_rank, species, R) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_ranked2_cyc_R <- as.data.frame(peaks_total_R[peaks_total_R$n == 2 &
-                                                   peaks_total_R$step == max_steps &
+                                                   peaks_total_R$step >= max_steps &
                                                               peaks_total_R$walking == "random",] |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, rank, species, R) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walk_rep, re_rank, species, R) |>
                             dplyr::summarise(rank_peaked = n())) 
 
-#peaks_total_ranked2_cyc_R$rank <- 17 # no cycles
+peaks_total_ranked2_cyc_R$re_rank <- 17 
 
-peaks_total_ranked2_R <- bind_rows(peaks_total_ranked2_R, peaks_total_ranked2_cyc_R)
+peaks_total_ranked2_R <- bind_rows(peaks_total_ranked2_R)
 
 peaks_total_ranked2_comb_R <- peaks_total_ranked2_R[peaks_total_ranked2_R$species == 1,]
 
-colnames(peaks_total_ranked2_comb_R)[9] <- "rank_sp1"
-peaks_total_ranked2_comb_R$rank_sp2 <- peaks_total_ranked2_R[peaks_total_ranked2_R$species == 2, "rank"]
+colnames(peaks_total_ranked2_comb_R)[9] <- "re_rank_sp1"
+peaks_total_ranked2_comb_R$re_rank_sp2 <- peaks_total_ranked2_R[peaks_total_ranked2_R$species == 2, "re_rank"]
 
 peaks_total_ranked2_summarised_R <- as.data.frame(peaks_total_ranked2_comb_R |> 
-                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, rank_sp1, rank_sp2, species) |>
+                            dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, re_rank_sp1, re_rank_sp2, species, R) |>
                             dplyr::summarise(rank_peaked = n())) 
 
 peaks_total_ranked2_summarised_R$landscape_ID <- interaction(peaks_total_ranked2_summarised_R$n, peaks_total_ranked2_summarised_R$k, peaks_total_ranked2_summarised_R$c, peaks_total_ranked2_summarised_R$c_rep, peaks_total_ranked2_summarised_R$scape_rep)
@@ -716,8 +779,8 @@ peaks_total_ranked2_summarised_R$landscape_ID <- interaction(peaks_total_ranked2
 #save data
 save(peaks_total, # summary output of every single replicate walk on every replicate landscape
      peaks_total_R, # summary output of every single replicate walk on every replicate landscape for R = 2
-     peaks_summarised, # this is for exploratory plotting; I grouped the results by how many species reach the global fitness peak
-     peaks_summarised_cycles, # this is for exploratory plotting; I grouped the results by how often cycling occurs
+     #peaks_summarised, # this is for exploratory plotting; I grouped the results by how many species reach the global fitness peak
+     #peaks_summarised_cycles, # this is for exploratory plotting; I grouped the results by how often cycling occurs
      peaks_total_ranked_summarised, # endpoints grouped by how often they occur
      peaks_total_ranked_summarised_R, # endpoints grouped by how often they occur for R = 2
      peaks_total_ranked2_summarised, # endpoints grouped by how often they occur; both species combined and only for random adaptive walks
@@ -736,7 +799,11 @@ save(peaks_total, # summary output of every single replicate walk on every repli
      peaks_nkcs_2011_Random,
      peaks_nkcs_2121_Random,
      peaks_nkcs_2021_Random,
-     file = "NKC_landscapes")
+     peaks_nkcs_4001,
+                                peaks_nkcs_4101,
+                                peaks_nkcs_4201,
+                                peaks_nkcs_4301,
+     file = "NKC_landscapes_final")
 ```
 
 
@@ -750,7 +817,7 @@ set.seed(2512) # for reproducibility
 p = 0 # number of pleiotropic loci; I have not actually implemented this yet lol but I also don't need it - take it as free future inspiration
 env_tot = 2 # total number of environments in the system
 lambda_change = 1 # if I want to draw the number of mutational steps from a poisson distribution
-max_steps = 150
+max_steps = 250
 
 # defining the starting sequences for N = 4, so I can cycle through all possible starting points
 types_n4 <- gtools::permutations(a, 4, c(1:a), repeats = TRUE) # all possible metagenotypes
@@ -904,6 +971,7 @@ peaks_nkke_400 <- assess_peaks_sea_input(n,
                          start_seqs = seqs_n4,
                          max_steps)
 
+set.seed(2512)
 peaks_nkke_401 <- assess_peaks_sea_input(n, 
                          k = 0,
                          k_e = 1,
@@ -919,7 +987,7 @@ peaks_nkke_401 <- assess_peaks_sea_input(n,
                          walk_type, 
                          walk_start, 
                          start_seqs = seqs_n4,
-                         max_steps = 10)
+                         max_steps)
 
 peaks_nkke_402 <- assess_peaks_sea_input(n, 
                          k = 0,
@@ -992,23 +1060,6 @@ peaks_nkke_412 <- assess_peaks_sea_input(n,
 # asymmetric environment change (more time spent in environment 1)
 set.seed(2512)
 
-peaks_nkke_400_R <- assess_peaks_sea_input(n, 
-                         k = 0,
-                         k_e = 0,
-                         a, 
-                         p,
-                         change = 2,
-                         lambda_change,
-                         env_tot,
-                         IM_seas = IM_sea_k0_ke0,
-                         peaks_nkke_400[[3]], 
-                         scape_reps = 200,
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         start_seqs = seqs_n4,
-                         max_steps)
-
 peaks_nkke_401_R <- assess_peaks_sea_input(n, 
                          k = 0,
                          k_e = 1,
@@ -1036,23 +1087,6 @@ peaks_nkke_402_R <- assess_peaks_sea_input(n,
                          env_tot,
                          IM_seas = IM_sea_k0_ke2,
                          peaks_nkke_402[[3]],
-                         scape_reps = 200, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         start_seqs = seqs_n4,
-                         max_steps)
-
-peaks_nkke_410_R <- assess_peaks_sea_input(n, 
-                         k = 1,
-                         k_e = 0,
-                         a, 
-                         p,
-                         change = 2,
-                         lambda_change,
-                         env_tot,
-                         IM_seas = IM_sea_k1_ke0,
-                         peaks_nkke_410[[3]],
                          scape_reps = 200, 
                          walk_reps, 
                          walk_type, 
@@ -1098,23 +1132,6 @@ peaks_nkke_412_R <- assess_peaks_sea_input(n,
 # stochastic environment change (randomly changing between environments; mutation rounds spent in environment drawn from poisson distribution)
 set.seed(2512)
 
-peaks_nkke_400_Random <- assess_peaks_sea_input(n, 
-                         k = 0,
-                         k_e = 0,
-                         a, 
-                         p,
-                         change = NA,
-                         lambda_change,
-                         env_tot,
-                         IM_seas = IM_sea_k0_ke0,
-                         peaks_nkke_400[[3]], 
-                         scape_reps = 200,
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         start_seqs = seqs_n4,
-                         max_steps)
-
 peaks_nkke_401_Random <- assess_peaks_sea_input(n, 
                          k = 0,
                          k_e = 1,
@@ -1142,23 +1159,6 @@ peaks_nkke_402_Random <- assess_peaks_sea_input(n,
                          env_tot,
                          IM_seas = IM_sea_k0_ke2,
                          peaks_nkke_402[[3]],
-                         scape_reps = 200, 
-                         walk_reps, 
-                         walk_type, 
-                         walk_start, 
-                         start_seqs = seqs_n4,
-                         max_steps)
-
-peaks_nkke_410_Random <- assess_peaks_sea_input(n, 
-                         k = 1,
-                         k_e = 0,
-                         a, 
-                         p,
-                         change = NA,
-                         lambda_change,
-                         env_tot,
-                         IM_seas = IM_sea_k1_ke0,
-                         peaks_nkke_410[[3]],
                          scape_reps = 200, 
                          walk_reps, 
                          walk_type, 
@@ -1209,16 +1209,12 @@ peaks_total_sea <- dplyr::bind_rows(peaks_nkke_400[[1]], # combine all simulatio
                                     peaks_nkke_412[[1]]) 
 
 # for irregular environmental change
-peaks_total_sea_R <- dplyr::bind_rows(peaks_nkke_400_R[[1]], 
-                                    peaks_nkke_401_R[[1]],
+peaks_total_sea_R <- dplyr::bind_rows(peaks_nkke_401_R[[1]],
                                     peaks_nkke_402_R[[1]],
-                                    peaks_nkke_410_R[[1]],
                                     peaks_nkke_411_R[[1]],
                                     peaks_nkke_412_R[[1]],
-                                    peaks_nkke_400_Random[[1]], 
                                     peaks_nkke_401_Random[[1]],
                                     peaks_nkke_402_Random[[1]],
-                                    peaks_nkke_410_Random[[1]],
                                     peaks_nkke_411_Random[[1]],
                                     peaks_nkke_412_Random[[1]]) 
 
@@ -1232,17 +1228,99 @@ peaks_total_sea_R$E2.reached <- peaks_total_sea_R$E2.fitness == peaks_total_sea_
 
 ## 2.3) summarise
 ```{r}
+#### I recode the ranks ranks to shift everything on the same scale (e.g., when C = 0, there are only 4 distinct fitness ranks for a species -> I shift the ranks so they cover the same scale as the 16 unique ranks possible on landscapes with C > 0)
+
+peaks_total_sea$E1.re_rank <- peaks_total_sea$E1.rank
+peaks_total_sea$E2.re_rank <- peaks_total_sea$E2.rank
+
+# in the absence of intergenomic epistasis ther are only 4 distinct fitness ranks per species
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E1.rank == 1, "E1.re_rank"] <- 1
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E1.rank == 2, "E1.re_rank"] <- 5
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E1.rank == 3, "E1.re_rank"] <- 9
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E1.rank == 4, "E1.re_rank"] <- 13
+
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E2.rank == 1, "E2.re_rank"] <- 1
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E2.rank == 2, "E2.re_rank"] <- 5
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E2.rank == 3, "E2.re_rank"] <- 9
+peaks_total_sea[peaks_total_sea$k_e == 0 & peaks_total_sea$E2.rank == 4, "E2.re_rank"] <- 13
+
+# depending on the intergenomic interaction matrix there is some neutrality/redundancy between metagenotypes and therefore less fitness ranks
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 2 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 3
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 3 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 5
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 4 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 7
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 5 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 9
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 6 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 11
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 7 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 13
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E1.rank == 8 & peaks_total_sea$sea_rep == 1, "E1.re_rank"] <- 15
+
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 2 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 3
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 3 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 5
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 4 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 7
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 5 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 9
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 6 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 11
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 7 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 13
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 8 & peaks_total_sea$sea_rep == 1, "E2.re_rank"] <- 15
+
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 2 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 3
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 3 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 5
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 4 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 7
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 5 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 9
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 6 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 11
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 7 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 13
+peaks_total_sea[peaks_total_sea$k_e == 1 & peaks_total_sea$E2.rank == 8 & peaks_total_sea$sea_rep == 4, "E2.re_rank"] <- 15
+
+## same for variable R
+peaks_total_sea_R$E1.re_rank <- peaks_total_sea_R$E1.rank
+peaks_total_sea_R$E2.re_rank <- peaks_total_sea_R$E2.rank
+
+# in the absence of intergenomic epistasis ther are only 4 distinct fitness ranks per species
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E1.rank == 1, "E1.re_rank"] <- 1
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E1.rank == 2, "E1.re_rank"] <- 5
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E1.rank == 3, "E1.re_rank"] <- 9
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E1.rank == 4, "E1.re_rank"] <- 13
+
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E2.rank == 1, "E2.re_rank"] <- 1
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E2.rank == 2, "E2.re_rank"] <- 5
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E2.rank == 3, "E2.re_rank"] <- 9
+peaks_total_sea_R[peaks_total_sea_R$k_e == 0 & peaks_total_sea_R$E2.rank == 4, "E2.re_rank"] <- 13
+
+# depending on the intergenomic interaction matrix there is some neutrality/redundancy between metagenotypes and therefore less fitness ranks
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 2 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 3
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 3 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 5
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 4 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 7
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 5 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 9
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 6 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 11
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 7 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 13
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E1.rank == 8 & peaks_total_sea_R$sea_rep == 1, "E1.re_rank"] <- 15
+
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 2 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 3
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 3 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 5
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 4 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 7
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 5 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 9
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 6 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 11
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 7 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 13
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 8 & peaks_total_sea_R$sea_rep == 1, "E2.re_rank"] <- 15
+
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 2 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 3
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 3 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 5
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 4 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 7
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 5 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 9
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 6 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 11
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 7 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 13
+peaks_total_sea_R[peaks_total_sea_R$k_e == 1 & peaks_total_sea_R$E2.rank == 8 & peaks_total_sea_R$sea_rep == 4, "E2.re_rank"] <- 15
+
+
 peaks_sea_ranked_summarised <- as.data.frame(peaks_total_sea[peaks_total_sea$step < max_steps,] |> 
-                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank) |>
+                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.re_rank, E2.re_rank) |>
                             dplyr::summarise(rank_peaked = n())) 
 peaks_sea_ranked_summarised$cycle <- "no"
 
 peaks_sea_cycle_summarised <- as.data.frame(peaks_total_sea[peaks_total_sea$step >= max_steps,] |> 
-                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank) |>
+                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.re_rank, E2.re_rank) |>
                             dplyr::summarise(cycle_count = n())) 
 peaks_sea_cycle_summarised$cycle <- "yes" 
-#peaks_sea_cycle_summarised$E1.rank <- 17 # will do this later this time
-#peaks_sea_cycle_summarised$E2.rank <- 17 # will do this later this time
+#peaks_sea_cycle_summarised$E1.re_rank <- 17 # will do this later this time
+#peaks_sea_cycle_summarised$E2.re_rank <- 17 # will do this later this time
 
 peaks_sea_ranked_summarised <- merge(peaks_sea_ranked_summarised, 
       peaks_sea_cycle_summarised, 
@@ -1253,19 +1331,18 @@ peaks_sea_ranked_summarised$tot_reps <- walk_reps
 peaks_sea_ranked_summarised$prop_rank_peaked <- peaks_sea_ranked_summarised$rank_peaked/peaks_sea_ranked_summarised$tot_reps
 peaks_sea_ranked_summarised$prop_cycle <- peaks_sea_ranked_summarised$cycle_count/peaks_sea_ranked_summarised$tot_reps
 
-
 #### same but with irregular environmental change
 peaks_sea_ranked_summarised_R <- as.data.frame(peaks_total_sea_R[peaks_total_sea_R$step < max_steps,] |> 
-                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank, change) |>
+                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.re_rank, E2.re_rank, change) |>
                             dplyr::summarise(rank_peaked = n())) 
 peaks_sea_ranked_summarised_R$cycle <- "no"
 
 peaks_sea_cycle_summarised_R <- as.data.frame(peaks_total_sea_R[peaks_total_sea_R$step >= max_steps,] |> 
-                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.rank, E2.rank, change) |>
+                            dplyr::group_by(k, k_e, n, a, sea_rep, scape_rep, walking, E1.re_rank, E2.re_rank, change) |>
                             dplyr::summarise(cycle_count = n())) 
 peaks_sea_cycle_summarised_R$cycle <- "yes" 
-peaks_sea_cycle_summarised_R$E1.rank <- 17 # for plotting reasons
-peaks_sea_cycle_summarised_R$E2.rank <- 17 # for plotting reasons
+#peaks_sea_cycle_summarised_R$E1.re_rank <- 17 # for plotting reasons
+#peaks_sea_cycle_summarised_R$E2.re_rank <- 17 # for plotting reasons
 
 peaks_sea_ranked_summarised_R <- merge(peaks_sea_ranked_summarised_R, 
       peaks_sea_cycle_summarised_R, 
@@ -1292,14 +1369,12 @@ save(peaks_total_sea,
                                     peaks_nkke_412,
      peaks_nkke_401_R,
                                     peaks_nkke_402_R,
-                                    peaks_nkke_410_R,
                                     peaks_nkke_411_R,
                                     peaks_nkke_412_R,
      peaks_nkke_401_Random,
                                     peaks_nkke_402_Random,
-                                    peaks_nkke_410_Random,
                                     peaks_nkke_411_Random,
                                     peaks_nkke_412_Random,
-     file = "seascapes")
+     file = "seascapes_final")
 
 ```
