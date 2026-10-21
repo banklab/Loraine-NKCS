@@ -1,29 +1,31 @@
 ---
 title: "NKC_exploration"
+author: Loraine Hablützel
 output: html_notebook
 ---
 
-Loraine Hablützel - 29.07.2026
-This is the code used to generate all simulations; note that this takes quite a while to run with the number of landscape replicates, walk replicates and adaptive walk cutoffs I'm using. (Estimate: ~2 days for the NK(C) simulations and another ~3 days for the seascapes; once the NKC landscapes have been generated, you can plug them into the simulations with different mutation rates or reuse them for the seascapes simulations, so these parts can be split up and ran in parallel!)
+Loraine Hablützel - 20.10.2026
+
+This is the code used to generate all simulations; note that this takes quite a while to run with the number of landscape replicates, walk replicates and adaptive walk cutoffs I'm using. (Estimate: ~2 days for the NK(C) simulations and another ~3 days for the seascapes; once the NKC landscapes have been generated, you can plug them into the simulations with different mutation rates (R) or reuse them for the seascapes simulations, so these parts can be split up and ran in parallel!)
 
 see preprint: https://doi.org/10.64898/2026.04.01.715933
 
-```{r setup, include=FALSE}
+```{r setup simulations, include=FALSE}
 knitr::opts_chunk$set(dev = "png")
 options(bitmapType = "cairo")
 
-knitr::opts_knit$set(root.dir = "~/OneDrive - Universitaet Bern/NKC_project/R_scripts/") # set directory
+knitr::opts_knit$set(root.dir = "...") # set your directory
 ```
 
 # Set up workspace
-```{r libraries}
+```{r libraries simulations}
 rm (list = ls())
 
 library(gtools) # permutations to get all possible genotype combinations
 library(dplyr) # for constructing the data sets
 
 # load NKC functions
-source(knitr::purl("NKC(S).Rmd", quiet=TRUE)) # this way I load the code from the code chunks in the markdown file; when running on the cluster I need to make sure all chunks have unique names, otherwise I'll get errors
+source(knitr::purl("NKCS.Rmd", quiet=TRUE)) # this way I load the code from the code chunks in the markdown file; when running on the cluster I need to make sure all chunks have unique names, otherwise I'll get errors
 
 ```
 
@@ -596,7 +598,7 @@ peaks_total <- dplyr::bind_rows(peaks_nkcs_4001[[1]],
                                 peaks_nkcs_2101[[1]],
                                 peaks_nkcs_2021[[1]],
                                 peaks_nkcs_2011[[1]],
-                                peaks_nkcs_2001[[1]]) #the bind_rows function allows me to bind dfs with different column numbers; missing values are filled with NA; this is because I want to compare the effect of variable n 
+                                peaks_nkcs_2001[[1]]) #the bind_rows function allows me to bind dfs with different column numbers; missing values are filled with NA; this is because I want to compare the effect of variable n (N =2, N'=4)
 
 peaks_total_R <- dplyr::bind_rows(peaks_nkcs_2111_R[[1]],
                                 peaks_nkcs_2011_R[[1]],
@@ -613,10 +615,10 @@ peaks_total_R$reached <- peaks_total_R$fitness == peaks_total_R$global_peak # I 
 ```
 
 ## 1.3) summarising the results
+### 1.3.1) shifting the ranks
+I recode the ranks ranks to shift everything on the same scale (e.g., when C = 0, there are only 4 distinct fitness ranks for a species -> I shift the ranks so they cover the same scale as the 16 unique ranks possible on landscapes with C > 0)
+
 ```{r}
-
-#### I recode the ranks ranks to shift everything on the same scale (e.g., when C = 0, there are only 4 distinct fitness ranks for a species -> I shift the ranks so they cover the same scale as the 16 unique ranks possible on landscapes with C > 0)
-
 peaks_total$re_rank <- peaks_total$rank
 
 # in the absence of intergenomic epistasis ther are only 4 distinct fitness ranks per species
@@ -668,7 +670,11 @@ peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 6 & peaks_total_R$c_r
 peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 7 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 13
 peaks_total_R[peaks_total_R$c == 1 & peaks_total_R$rank == 8 & peaks_total_R$c_rep == 4 & peaks_total_R$species == 2, "re_rank"] <- 15
 
-## summarise
+```
+
+### 1.3.2) summarising the results
+```{r}
+## summarising separately for those simulations that reached an equilibrium and those that did not
 peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < max_steps,] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, re_rank, species) |>
                             dplyr::summarise(rank_peaked = n())) 
@@ -676,13 +682,13 @@ peaks_total_ranked_summarised <- as.data.frame(peaks_total[peaks_total$step < ma
 peaks_total_cycle_summarised <- as.data.frame(peaks_total[peaks_total$step == max_steps,] |> 
                             dplyr::group_by(k, c, n, a, k_rep, c_rep, scape_rep, walking, species) |>
                             dplyr::summarise(cycle_count = n())) 
-peaks_total_cycle_summarised$re_rank <- 17 # I assign the cycles rank "17" for plotting reasons; obviously only works for my 2 sp/2 loci setup 
+peaks_total_cycle_summarised$re_rank <- 17 # I assign the cycles rank "17" for plotting reasons; obviously only works for my 2 sp/2 loci setup; this means I will look at cycle fitness differently later on
 
 peaks_total_ranked_summarised <- merge(peaks_total_ranked_summarised, 
       peaks_total_cycle_summarised, 
       all.x = TRUE, all.y = TRUE)
 
-## calculate percentages 
+## calculate proportions 
 peaks_total_ranked_summarised$tot_reps <- walk_reps
 peaks_total_ranked_summarised$prop_rank_peaked <- peaks_total_ranked_summarised$rank_peaked/peaks_total_ranked_summarised$tot_reps
 peaks_total_ranked_summarised$prop_cycle <- peaks_total_ranked_summarised$cycle_count/peaks_total_ranked_summarised$tot_reps
@@ -710,7 +716,7 @@ peaks_total_ranked_summarised_R <- merge(peaks_total_ranked_summarised_R,
       peaks_total_ranked_summarised_Ran,
       all.x = TRUE, all.y = TRUE)
 
-## calculate percentages 
+## calculate proportions 
 peaks_total_ranked_summarised_R$tot_reps <- walk_reps
 peaks_total_ranked_summarised_R$prop_rank_peaked <- peaks_total_ranked_summarised_R$rank_peaked/peaks_total_ranked_summarised_R$tot_reps
 peaks_total_ranked_summarised_R$prop_cycle <- peaks_total_ranked_summarised_R$cycle_count/peaks_total_ranked_summarised_R$tot_reps
