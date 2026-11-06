@@ -5,7 +5,7 @@ The code is based on the explanation of the NK model in Welch & Waxman (2005) + 
 
 The NKCS model was originally introduced by Kauffman & Johnsen (1991)
 
-This code was used to generate the results in "Repeatability of adaptation in interacting species" by Hablützel, MacPherson & Bank (see preprint: https://doi.org/10.64898/2026.04.01.715933)
+This code was used to generate the results in "Repeatability of adaptation in interacting species" by Hablützel, MacPherson & Bank (see preprint: https://doi.org/10.64898/2026.04.01.715933, published paper: https://doi.org/10.1093/genetics/iyag303)
 
 This folder contains the following R markdown files and notebooks:
 - NKCS.Rmd - the file that includes all the code to build the models (note that I've only tested it for fully symmetric 2-species communities)
